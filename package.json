@@ -1,0 +1,12 @@
+{
+  "name": "family-telegram-bot-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/bot",
+    "apps/web"
+  ],
+  "scripts": {
+    "postinstall": "npm -ws install"
+  }
+}
