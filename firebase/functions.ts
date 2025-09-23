@@ -1,54 +1,61 @@
-import * as functions from 'firebase-functions';
-import type { Request, Response } from 'express';
-import { telegramExpressApp, notifyFamily } from '../apps/bot/src/index.js';
+// firebase/functions.ts
+import { onRequest } from "firebase-functions/v2/https";
+import * as logger from "firebase-functions/logger";
+import { Telegraf, Markup } from "telegraf";
+import type { Update } from "telegraf/types";
 
-const allowedOrigin = process.env.WEBAPP_BASE_URL;
-const notifyApiKey = process.env.NOTIFY_API_KEY;
+const {
+  BOT_TOKEN,
+  BOT_USERNAME, // можно хранить для информации, но в конструктор не передаём
+  FAMILY_CHAT_ID,
+  WEBAPP_BASE_URL,
+  WEBAPP_SHOPPING_URL,
+  WEBAPP_CALENDAR_URL,
+  WEBAPP_BUDGET_URL,
+  NOTIFY_API_KEY,
+} = process.env;
 
-const handleCors = (req: Request, res: Response) => {
-  if (allowedOrigin && req.headers.origin === allowedOrigin) {
-    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-KEY');
-  }
+// Создаём бота ТОЛЬКО если есть токен, без лишних опций (username сюда не передают)
+const bot = BOT_TOKEN ? new Telegraf<Update>(BOT_TOKEN) : (null as unknown as Telegraf<Update>);
 
-  if (req.method === 'OPTIONS') {
-    res.status(204).send('');
-    return true;
-  }
+// Кнопки веб-аппов
+const menu = () =>
+  Markup.inlineKeyboard([
+    [Markup.button.webApp("🛒 Покупки", WEBAPP_SHOPPING_URL || `${WEBAPP_BASE_URL}/#/shopping`)],
+    [Markup.button.webApp("📅 Календарь", WEBAPP_CALENDAR_URL || `${WEBAPP_BASE_URL}/#/calendar`)],
+    [Markup.button.webApp("💰 Бюджет", WEBAPP_BUDGET_URL || `${WEBAPP_BASE_URL}/#/budget`)],
+  ]);
 
-  return false;
-};
+// Хэндлеры
+if (BOT_TOKEN) {
+  bot.start(async (ctx) => ctx.reply("Семейный бот — выберите раздел:", menu()));
+  bot.hears(/меню|menu|главное/i, async (ctx) => ctx.reply("Меню:", menu()));
+}
 
-export const telegramBot = functions.https.onRequest(telegramExpressApp);
+// HTTPS-вебхук Telegram
+export const telegramBot = onRequest({ cors: true }, async (req, res) => {
+  if (!BOT_TOKEN) return res.status(500).send("Bot is not configured");
+  const callback = bot.webhookCallback("/");
+  return callback(req as any, res as any);
+});
 
-export const notify = functions.https.onRequest(async (req, res) => {
-  if (handleCors(req, res)) {
-    return;
-  }
-
-  if (req.method !== 'POST') {
-    res.status(405).json({ ok: false, error: 'Method not allowed' });
-    return;
-  }
-
-  if (!notifyApiKey || req.headers['x-api-key'] !== notifyApiKey) {
-    res.status(401).json({ ok: false, error: 'Unauthorized' });
-    return;
-  }
-
-  const { text } = req.body ?? {};
-
-  if (typeof text !== 'string' || !text.trim()) {
-    res.status(400).json({ ok: false, error: 'Текст уведомления обязателен' });
-    return;
-  }
-
+// Простой эндпоинт уведомлений из фронта
+export const notify = onRequest({ cors: true }, async (req, res) => {
   try {
-    await notifyFamily(text);
-    res.json({ ok: true });
-  } catch (error) {
-    console.error('Failed to notify family', error);
-    res.status(500).json({ ok: false, error: 'Ошибка при отправке уведомления' });
+    if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
+    if (!BOT_TOKEN || !FAMILY_CHAT_ID) return res.status(500).send("Server not configured");
+
+    const apiKey = req.header("x-api-key") || req.header("X-API-KEY");
+    if (!apiKey || apiKey !== NOTIFY_API_KEY) return res.status(401).send("Unauthorized");
+
+    const { text } = (req.body || {}) as { text?: string };
+    const msg = (text || "").trim();
+    if (!msg) return res.status(400).send("Text is required");
+
+    await bot.telegram.sendMessage(FAMILY_CHAT_ID, msg);
+    res.status(200).send({ ok: true });
+  } catch (e) {
+    logger.error("notify error", e);
+    res.status(500).send("Internal error");
   }
 });
