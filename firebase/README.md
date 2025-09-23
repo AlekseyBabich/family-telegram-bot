@@ -24,3 +24,5 @@ firebase deploy --only firestore:rules
 ```
 
 > ⚠️ Firebase CLI и Node 18+ требуются для деплоя Cloud Functions v2.
+
+trigger build
