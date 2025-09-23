@@ -4,9 +4,11 @@
   "version": "0.1.0",
   "workspaces": [
     "apps/bot",
-    "apps/web"
+    "apps/web",
+    "firebase"
   ],
   "scripts": {
+    "ci": "npm ci",
     "postinstall": "npm -ws install"
   }
 }

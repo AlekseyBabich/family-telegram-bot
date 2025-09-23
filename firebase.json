@@ -1,0 +1,12 @@
+{
+  "hosting": {
+    "site": "family-bot-33940",
+    "public": "apps/web/dist",
+    "ignore": ["**/.*", "**/node_modules/**"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+  },
+  "functions": {
+    "source": "firebase",
+    "runtime": "nodejs20"
+  }
+}

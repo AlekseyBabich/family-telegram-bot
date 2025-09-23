@@ -1,0 +1,22 @@
+{
+  "name": "family-telegram-functions",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/functions.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "deploy:functions": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "firebase-functions": "^4.6.1",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "typescript": "^5.3.3"
+  }
+}
