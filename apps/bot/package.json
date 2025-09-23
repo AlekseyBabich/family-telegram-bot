@@ -1,0 +1,21 @@
+{
+  "name": "family-telegram-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.30",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

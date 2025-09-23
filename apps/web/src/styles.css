@@ -1,0 +1,240 @@
+:root {
+  color-scheme: light dark;
+  --bg-color: #f4f5f7;
+  --card-bg: #ffffff;
+  --text-color: #111827;
+  --accent-color: #2563eb;
+  --accent-color-muted: rgba(37, 99, 235, 0.1);
+  --border-color: rgba(15, 23, 42, 0.08);
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg-color);
+  color: var(--text-color);
+}
+
+body.tg-theme-dark {
+  --bg-color: #0f172a;
+  --card-bg: #1e293b;
+  --text-color: #e2e8f0;
+  --accent-color-muted: rgba(96, 165, 250, 0.12);
+  --border-color: rgba(148, 163, 184, 0.2);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border-color);
+  gap: 12px;
+}
+
+.header-title {
+  font-weight: 600;
+}
+
+.header-nav {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+}
+
+.header-tab {
+  padding: 6px 12px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--text-color);
+  background: transparent;
+  border: 1px solid transparent;
+  font-size: 14px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.header-tab-active {
+  background: var(--accent-color-muted);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.header-user {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.header-user-anon {
+  font-style: italic;
+}
+
+.app-main {
+  flex: 1;
+  padding: 16px;
+}
+
+.page {
+  display: grid;
+  gap: 16px;
+}
+
+.section-card {
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+  border: 1px solid var(--border-color);
+}
+
+.section-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-card-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.section-card-actions {
+  display: flex;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.inline-form input,
+.inline-form button,
+.calendar-form input,
+.calendar-form button {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  font-size: 14px;
+}
+
+.inline-form button,
+.calendar-form button {
+  background: var(--accent-color);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.inline-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.shopping-list,
+.calendar-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shopping-list li,
+.calendar-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.shopping-list li.done {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.check-btn,
+.delete-btn,
+.calendar-actions button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.check-btn {
+  font-size: 18px;
+}
+
+.delete-btn {
+  color: #ef4444;
+}
+
+.calendar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.calendar-date {
+  display: block;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.calendar-description {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.empty {
+  text-align: center;
+  opacity: 0.6;
+}
+
+@media (max-width: 600px) {
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-nav {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .section-card {
+    padding: 12px;
+  }
+
+  .section-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .inline-form {
+    flex-direction: column;
+  }
+
+  .calendar-form {
+    display: grid;
+    gap: 8px;
+  }
+}
