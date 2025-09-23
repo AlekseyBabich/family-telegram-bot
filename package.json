@@ -8,7 +8,6 @@
     "firebase"
   ],
   "scripts": {
-    "ci": "npm ci",
-    "postinstall": "npm -ws install"
+    "ci": "npm ci"
   }
 }

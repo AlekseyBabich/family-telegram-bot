@@ -25,3 +25,7 @@
    - Push to `main` → `firebase-functions.yml` builds and deploys Functions.
 6. Set Telegram webhook (BotFather):
    /setwebhook → https://<your-cloud-function-domain>/telegramBot
+
+## Workspace installs
+
+The root `postinstall` script was removed because it triggered an infinite loop in CI. Workspaces are still installed by running `npm install` locally or in GitHub Actions, where installs use `--ignore-scripts` to avoid reintroducing the loop.
