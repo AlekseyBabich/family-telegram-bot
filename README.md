@@ -29,3 +29,5 @@
 ## Workspace installs
 
 The root `postinstall` script was removed because it triggered an infinite loop in CI. Workspaces are still installed by running `npm install` locally or in GitHub Actions, where installs use `--ignore-scripts` to avoid reintroducing the loop.
+
+trigger build
