@@ -20,8 +20,8 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install deps
-        run: npm install
+      - name: Install deps (skip postinstall)
+        run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Build web
         run: npm --workspace apps/web run build
