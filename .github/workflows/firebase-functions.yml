@@ -21,7 +21,7 @@ jobs:
           node-version: "20"
 
       - name: Install deps
-        run: npm ci
+        run: npm install
 
       - name: Build functions (TypeScript → JS)
         run: npm --workspace firebase run build
