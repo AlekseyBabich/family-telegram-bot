@@ -1,0 +1,74 @@
+##### OS / редакторы #####
+# Windows / macOS мусор
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Временные файлы редакторов
+*.swp
+*.swo
+*.tmp
+*~
+*.orig
+*.rej
+
+# IDE/редакторы (оставь закомментированным, если хотите шарить настройки воркспейса)
+.vscode/
+.idea/
+*.iml
+*.sln
+*.njsproj
+*.ntvs*
+
+##### Node / монорепо #####
+# node_modules везде (монорепо)
+node_modules/
+**/node_modules/
+
+# логи менеджеров пакетов
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# lock-файлы НЕ игнорируем — пусть остаются под контролем версий
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+##### Env-файлы #####
+# любые .env в проектах/пакетах
+**/.env
+**/.env.*
+# но пример оставляем в репозитории
+!**/.env.example
+
+##### Сборка / кэш #####
+# Vite / TS / прочие билды
+dist/
+**/dist/
+build/
+**/build/
+.vite/
+**/.vite/
+.cache/
+**/.cache/
+.tmp/
+.temp/
+coverage/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+##### Firebase / эмуляторы #####
+.firebase/
+firebase-debug.log
+.runtimeconfig.json
+# оставляем в репо (важно): firebase.json, .firebaserc
+
+##### Прочее #####
+# локальная история некоторых расширений
+.history/
+
