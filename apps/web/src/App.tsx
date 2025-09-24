@@ -17,6 +17,7 @@ const App = () => {
           <Route path="/shopping" element={<Shopping user={user} />} />
           <Route path="/calendar" element={<Calendar user={user} />} />
           <Route path="/budget" element={<Budget user={user} />} />
+          <Route path="*" element={<Navigate to="/shopping" replace />} />
         </Routes>
       </main>
     </div>
