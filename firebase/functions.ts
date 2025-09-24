@@ -28,27 +28,44 @@ if (bot) {
 }
 
 export const telegramBot = onRequest({ cors: true }, async (req, res) => {
-  if (!bot) return res.status(500).send("Bot is not configured");
+  if (!bot) {
+    res.status(500).send("Bot is not configured");
+    return;
+  }
   const callback = bot.webhookCallback("/");
-  return callback(req as any, res as any);
+  await callback(req as any, res as any);
 });
 
 export const notify = onRequest({ cors: true }, async (req, res) => {
   try {
-    if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
-    if (!bot || !FAMILY_CHAT_ID) return res.status(500).send("Server not configured");
+    if (req.method !== "POST") {
+      res.status(405).send("Method Not Allowed");
+      return;
+    }
+    if (!bot || !FAMILY_CHAT_ID) {
+      res.status(500).send("Server not configured");
+      return;
+    }
 
     const apiKey = req.header("x-api-key") || req.header("X-API-KEY");
-    if (!apiKey || apiKey !== NOTIFY_API_KEY) return res.status(401).send("Unauthorized");
+    if (!apiKey || apiKey !== NOTIFY_API_KEY) {
+      res.status(401).send("Unauthorized");
+      return;
+    }
 
     const { text } = (req.body || {}) as { text?: string };
     const msg = (text || "").trim();
-    if (!msg) return res.status(400).send("Text is required");
+    if (!msg) {
+      res.status(400).send("Text is required");
+      return;
+    }
 
     await bot.telegram.sendMessage(FAMILY_CHAT_ID, msg);
     res.status(200).send({ ok: true });
+    return;
   } catch (e) {
     logger.error("notify error", e);
     res.status(500).send("Internal error");
+    return;
   }
 });
