@@ -8,6 +8,11 @@
     "firebase"
   ],
   "scripts": {
-    "ci": "npm ci"
+    "ci": "npm ci",
+    "build:web": "npm --workspace apps/web run build",
+    "deploy:web": "firebase deploy --only hosting",
+    "build:functions": "npm --workspace firebase run build",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:all": "npm run build:web && npm run build:functions && firebase deploy"
   }
 }
