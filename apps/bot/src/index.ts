@@ -2,8 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import { Telegraf } from 'telegraf';
 import type { Context } from 'telegraf';
-import { RU, createReplyKeyboard, createWebAppKeyboard, type WebAppUrls } from './menu.js';
-import { createNotifyFamily, type NotifyFamily } from './notify.js';
+import { RU, createReplyKeyboard, createWebAppKeyboard, type WebAppUrls } from './menu';
+import { createNotifyFamily, type NotifyFamily } from './notify';
 
 const requireEnv = (key: keyof NodeJS.ProcessEnv): string => {
   const value = process.env[key];
@@ -15,17 +15,13 @@ const requireEnv = (key: keyof NodeJS.ProcessEnv): string => {
 };
 
 const BOT_TOKEN = requireEnv('BOT_TOKEN');
-const botUsername = process.env.BOT_USERNAME;
-
 const webAppUrls: WebAppUrls = {
   shopping: requireEnv('WEBAPP_SHOPPING_URL'),
   calendar: requireEnv('WEBAPP_CALENDAR_URL'),
   budget: requireEnv('WEBAPP_BUDGET_URL')
 };
 
-const bot = new Telegraf<Context>(BOT_TOKEN, {
-  username: botUsername
-});
+const bot = new Telegraf<Context>(BOT_TOKEN);
 
 const notifyFamily: NotifyFamily = createNotifyFamily(bot.telegram, process.env.FAMILY_CHAT_ID);
 
