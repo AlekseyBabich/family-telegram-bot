@@ -19,6 +19,7 @@ const Header = () => {
           <NavLink
             key={tab.path}
             to={tab.path}
+            end
             className={({ isActive }) =>
               `header-tab ${isActive ? 'header-tab-active' : ''}`
             }
