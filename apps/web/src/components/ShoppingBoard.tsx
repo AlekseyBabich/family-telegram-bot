@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { KeyboardEvent, useState } from 'react';
 import ShoppingModal from './ShoppingModal';
+import { sortItems } from '../utils/sort';
 
 interface ShoppingItem {
   id: string;
@@ -20,13 +21,15 @@ interface ShoppingModalState {
 }
 
 const createInitialItems = (columnIndex: number): ShoppingItem[] =>
-  Array.from({ length: 20 }, (_, index) => {
-    const id = `list-${columnIndex + 1}-item-${index + 1}`;
-    const title = `Продукт ${index + 1}`;
-    const done = (index + columnIndex) % 3 === 0 || index % 5 === 0;
+  sortItems(
+    Array.from({ length: 20 }, (_, index) => {
+      const id = `list-${columnIndex + 1}-item-${index + 1}`;
+      const title = `Продукт ${index + 1}`;
+      const done = (index + columnIndex) % 3 === 0 || index % 5 === 0;
 
-    return { id, title, done };
-  });
+      return { id, title, done };
+    })
+  );
 
 const createInitialColumns = (): ShoppingColumn[] => [
   { id: 'list-1', title: 'Список 1', items: createInitialItems(0) },
@@ -54,6 +57,36 @@ const ShoppingBoard = () => {
     setModalState((state) => ({ ...state, isOpen: false, title: '' }));
   };
 
+  const toggleItem = (columnId: string, itemId: string) => {
+    setColumns((prevColumns) =>
+      prevColumns.map((column) => {
+        if (column.id !== columnId) {
+          return column;
+        }
+
+        const updatedItems = column.items.map((item) =>
+          item.id === itemId ? { ...item, done: !item.done } : item
+        );
+
+        return {
+          ...column,
+          items: sortItems(updatedItems),
+        };
+      })
+    );
+  };
+
+  const handleItemKeyDown = (
+    event: KeyboardEvent<HTMLLIElement>,
+    columnId: string,
+    itemId: string
+  ) => {
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Space') {
+      event.preventDefault();
+      toggleItem(columnId, itemId);
+    }
+  };
+
   const handleAddItem = () => {
     const trimmedTitle = modalState.title.trim();
     if (!trimmedTitle) {
@@ -74,7 +107,7 @@ const ShoppingBoard = () => {
 
         return {
           ...column,
-          items: [...column.items, newItem],
+          items: sortItems([...column.items, newItem]),
         };
       })
     );
@@ -90,7 +123,17 @@ const ShoppingBoard = () => {
             <div className="shopping-column-title">{column.title}</div>
             <ul className="shopping-items">
               {column.items.map((item) => (
-                <li key={item.id} className="shopping-item">
+                <li
+                  key={item.id}
+                  className="shopping-item"
+                  tabIndex={0}
+                  role="button"
+                  aria-pressed={item.done}
+                  onClick={() => toggleItem(column.id, item.id)}
+                  onKeyDown={(event) =>
+                    handleItemKeyDown(event, column.id, item.id)
+                  }
+                >
                   <span className={`shopping-item-icon ${item.done ? 'done' : 'pending'}`}>
                     {item.done ? '✔' : '−'}
                   </span>
