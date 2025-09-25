@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
-import { Telegraf } from 'telegraf';
+import { Markup, Telegraf } from 'telegraf';
 import type { Context } from 'telegraf';
-import { RU, createReplyKeyboard, createWebAppKeyboard, type WebAppUrls } from './menu';
+import { RU, createWebAppKeyboard } from './menu';
 import { createNotifyFamily, type NotifyFamily } from './notify';
 
 const requireEnv = (key: keyof NodeJS.ProcessEnv): string => {
@@ -15,31 +15,52 @@ const requireEnv = (key: keyof NodeJS.ProcessEnv): string => {
 };
 
 const BOT_TOKEN = requireEnv('BOT_TOKEN');
-const webAppUrls: WebAppUrls = {
-  shopping: requireEnv('WEBAPP_SHOPPING_URL'),
-  calendar: requireEnv('WEBAPP_CALENDAR_URL'),
-  budget: requireEnv('WEBAPP_BUDGET_URL')
-};
+const webAppUrl = requireEnv('WEBAPP_URL');
 
 const bot = new Telegraf<Context>(BOT_TOKEN);
 
 const notifyFamily: NotifyFamily = createNotifyFamily(bot.telegram, process.env.FAMILY_CHAT_ID);
 
-const replyKeyboard = createReplyKeyboard();
-const webAppKeyboard = createWebAppKeyboard(webAppUrls);
+const webAppKeyboard = createWebAppKeyboard(webAppUrl);
+
+const legacyButtonTexts = [...RU.legacyButtons];
+
+const hideLegacyReplyKeyboard = async (ctx: Context) => {
+  if (!ctx.chat) {
+    return;
+  }
+
+  try {
+    const cleanupMessage = await ctx.reply('\u200B', Markup.removeKeyboard());
+    await ctx.telegram.deleteMessage(ctx.chat.id, cleanupMessage.message_id);
+  } catch (error) {
+    console.error('KeyboardCleanupError', error);
+  }
+};
+
+void bot.telegram
+  .setChatMenuButton({
+    menuButton: {
+      type: 'web_app',
+      text: RU.buttonLabel,
+      web_app: {
+        url: webAppUrl
+      }
+    }
+  })
+  .catch((error) => {
+    console.error('MenuButtonError', error);
+  });
 
 bot.start(async (ctx) => {
-  const intro = `${RU.greeting}\n${RU.description}\n\n${RU.replyPrompt}`;
-  await ctx.reply(intro, replyKeyboard);
-  await ctx.reply(RU.webAppPrompt, webAppKeyboard);
+  await hideLegacyReplyKeyboard(ctx);
+  await ctx.reply(RU.greeting, webAppKeyboard);
 });
 
-bot.hears(
-  [RU.buttons.shopping, RU.buttons.calendar, RU.buttons.budget],
-  async (ctx) => {
-    await ctx.reply(RU.webAppPrompt, webAppKeyboard);
-  }
-);
+bot.hears(legacyButtonTexts, async (ctx) => {
+  await hideLegacyReplyKeyboard(ctx);
+  await ctx.reply(RU.greeting, webAppKeyboard);
+});
 
 const telegramExpressApp = express();
 const webhookPath = '/telegram/webhook';
