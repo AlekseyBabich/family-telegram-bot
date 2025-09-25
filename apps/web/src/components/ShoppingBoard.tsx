@@ -195,11 +195,18 @@ const ShoppingBoard = () => {
 
   return (
     <div className="shopping-board">
-      <div className="shopping-columns">
+      <div className="shopping-columns" data-testid="shopping-desktop-columns">
         {columns.map((column) => (
-          <div key={column.id} className="shopping-column">
+          <div
+            key={column.id}
+            className="shopping-column"
+            data-testid={`shopping-column-${column.id}`}
+          >
             <div className="shopping-column-title">{column.title}</div>
-            <ul className="shopping-items">
+            <ul
+              className="shopping-items"
+              data-testid={`shopping-list-${column.id}`}
+            >
               {column.items.map((item) => (
                 <li
                   key={item.id}
@@ -207,6 +214,8 @@ const ShoppingBoard = () => {
                   tabIndex={0}
                   role="button"
                   aria-pressed={item.done}
+                  data-item-id={item.id}
+                  data-item-title={item.title}
                   onClick={() => toggleItem(column.id, item.id)}
                   onKeyDown={(event) =>
                     handleItemKeyDown(event, column.id, item.id)

@@ -34,7 +34,7 @@ interface PopoverState {
 }
 
 const SWIPE_THRESHOLD_PX = 64;
-const LONG_PRESS_DURATION = 1000;
+export const LONG_PRESS_DURATION_MS = 1000;
 const LONG_PRESS_SWIPE_CANCEL_PX = 12;
 
 const ShoppingPager = ({
@@ -47,6 +47,7 @@ const ShoppingPager = ({
   const pagesRef = useRef<HTMLDivElement | null>(null);
   const pointerIdRef = useRef<number | null>(null);
   const startXRef = useRef(0);
+  const startYRef = useRef(0);
   const dragOffsetRef = useRef(0);
   const containerWidthRef = useRef(1);
   const isDraggingRef = useRef(false);
@@ -149,6 +150,7 @@ const ShoppingPager = ({
       containerWidthRef.current = pagesRef.current.clientWidth || 1;
       startXRef.current = event.clientX;
       dragOffsetRef.current = 0;
+      startYRef.current = event.clientY;
       isDraggingRef.current = false;
       setIsSwiping(false);
       cancelLongPress();
@@ -282,7 +284,7 @@ const ShoppingPager = ({
   ) : null;
 
   return (
-    <div className="shopping-mobile" aria-live="polite">
+    <div className="shopping-mobile" data-testid="shopping-mobile" aria-live="polite">
       <div className="shopping-tabs" role="tablist">
         {columns.map((column, index) => {
           const isActive = index === currentIndex;
@@ -301,10 +303,19 @@ const ShoppingPager = ({
         })}
       </div>
 
-      <div className="shopping-pager" ref={pagesRef}>
+      <div
+        className="shopping-pager"
+        ref={pagesRef}
+        data-testid="shopping-pager"
+      >
         <div className="shopping-pager-pages" style={pagesStyle}>
           {columns.map((column) => (
-            <div key={column.id} className="shopping-pager-page" role="tabpanel">
+            <div
+              key={column.id}
+              className="shopping-pager-page"
+              role="tabpanel"
+              data-testid={`shopping-pager-page-${column.id}`}
+            >
               <ul className="shopping-items">
                 {column.items.map((item) => (
                   <ShoppingPagerListItem
@@ -389,7 +400,7 @@ const ShoppingPagerListItem = ({
       const timer = window.setTimeout(() => {
         longPressTriggeredRef.current = true;
         onLongPress(columnId, item.id, anchorRect);
-      }, LONG_PRESS_DURATION);
+      }, LONG_PRESS_DURATION_MS);
       timerRef.current = timer;
 
       registerLongPressCancel(() => {
@@ -466,6 +477,8 @@ const ShoppingPagerListItem = ({
       tabIndex={0}
       role="button"
       aria-pressed={item.done}
+      data-item-id={item.id}
+      data-item-title={item.title}
       onClick={handleClick}
       onKeyDown={(event) => onKeyDown(event, columnId, item.id)}
       onPointerDown={handlePointerDown}
