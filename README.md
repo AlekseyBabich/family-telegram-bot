@@ -48,6 +48,15 @@
   npm run deploy:all
   ```
 
+## CI/CD для веб-приложения
+- **Секреты:** GitHub Action использует секрет `FIREBASE_SERVICE_ACCOUNT` с JSON сервисного аккаунта Firebase для проекта `family-bot-33940`.
+- **Триггеры:**
+  - pull request (opened/synchronize/reopened) → сборка `apps/web` и выкладка во временный preview-канал Firebase Hosting с автоматическим комментарием в PR.
+  - push в `main` (при изменениях в `apps/web/**`, корневых `package.json`/`package-lock.json`, `firebase.json` и самом workflow) → сборка `apps/web` и деплой на `family-bot-33940.web.app`.
+- **Как отключить или скорректировать:**
+  - Чтобы временно отключить превью, закомментируйте или удалите блок `pull_request` в `.github/workflows/web-preview.yml`.
+  - Чтобы изменить, какие изменения запускают прод-выкладку, обновите список путей в секции `on.push.paths` файла `.github/workflows/web-prod.yml`.
+
 ## Установка вебхука Telegram
 Настройте вебхук через BotFather (`/setwebhook`) или напрямую запросом вида:
 ```
