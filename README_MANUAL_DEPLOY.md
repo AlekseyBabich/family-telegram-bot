@@ -48,6 +48,7 @@ firebase functions:secrets:set <ИМЯ>
 - `BOT_USERNAME` — @username бота (без `@`).
 - `FAMILY_CHAT_ID` — идентификатор семейного чата.
 - `NOTIFY_API_KEY` — ключ, который используется веб-приложением для вызова функции уведомлений.
+- `WEBAPP_URL` — полный URL WebApp (используется для кнопок в интерфейсе Telegram).
 
 > Совет: Можно передать значение напрямую: `firebase functions:secrets:set BOT_TOKEN --data "123:ABC"`.
 

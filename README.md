@@ -61,5 +61,21 @@ https://api.telegram.org/bot<ВАШ_BOT_TOKEN>/setWebhook?url=https://<firebase-
 - Секреты не заданы: убедитесь, что все четыре секрета существуют в Firebase Functions.
 - Не установлен Node.js 18+: обновите Node до LTS.
 
+## Настройка WebApp URL и проверка интерфейса бота
+- Добавлен единый WebApp-интерфейс. Задайте переменную `WEBAPP_URL` cо ссылкой на продакшен- или локальный WebApp:
+  - Локально — через файл `.env` в корне монорепозитория.
+  - В облаке — командой `firebase functions:secrets:set WEBAPP_URL --data "https://example.com"`.
+- После деплоя проверьте работу бота:
+  1. Отправьте `/start` в Telegram — бот должен ответить одной фразой «Hello! Open the app:» и кнопкой «Open the app».
+  2. Убедитесь, что под полем ввода не осталось старых Reply-клавиатур.
+  3. Откройте меню (≡) в чате — там должна появиться кнопка WebApp с тем же URL.
+
+### Обновлённые файлы
+- `apps/bot/src/index.ts`
+- `apps/bot/src/menu.ts`
+- `apps/bot/src/types.d.ts`
+- `firebase/functions.ts`
+- `.env.example`
+
 ## Как вернуться к CI/CD
 Для возврата к автоматическим деплоям необходимо снова включить биллинг в Firebase и восстановить GitHub Actions workflows (`.github/workflows`). После этого можно настроить токены и секреты для сервис-аккаунта, чтобы автоматические пайплайны снова запускались при пушах в основную ветку.

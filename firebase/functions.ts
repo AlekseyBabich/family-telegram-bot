@@ -1,30 +1,66 @@
 import { onRequest } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { Telegraf, Markup } from "telegraf";
+import type { Context } from "telegraf";
 
 const {
   BOT_TOKEN,
   BOT_USERNAME,
   FAMILY_CHAT_ID,
-  WEBAPP_BASE_URL,
-  WEBAPP_SHOPPING_URL,
-  WEBAPP_CALENDAR_URL,
-  WEBAPP_BUDGET_URL,
+  WEBAPP_URL,
   NOTIFY_API_KEY,
 } = process.env;
 
 const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
 
-const menu = () =>
-  Markup.inlineKeyboard([
-    [Markup.button.webApp("🛒 Покупки", WEBAPP_SHOPPING_URL || `${WEBAPP_BASE_URL}/#/shopping`)],
-    [Markup.button.webApp("📅 Календарь", WEBAPP_CALENDAR_URL || `${WEBAPP_BASE_URL}/#/calendar`)],
-    [Markup.button.webApp("💰 Бюджет", WEBAPP_BUDGET_URL || `${WEBAPP_BASE_URL}/#/budget`)],
-  ]);
+const webAppUrl = WEBAPP_URL;
+
+const startKeyboard = webAppUrl
+  ? Markup.inlineKeyboard([[Markup.button.webApp("Open the app", webAppUrl)]])
+  : null;
+
+const hideLegacyReplyKeyboard = async (ctx: Context) => {
+  if (!ctx.chat) {
+    return;
+  }
+
+  try {
+    const cleanupMessage = await ctx.reply("\u200B", Markup.removeKeyboard());
+    await ctx.telegram.deleteMessage(ctx.chat.id, cleanupMessage.message_id);
+  } catch (error) {
+    logger.error("KeyboardCleanupError", error);
+  }
+};
+
+const sendWebAppEntry = async (ctx: Context) => {
+  if (!startKeyboard || !webAppUrl) {
+    await ctx.reply("WebApp URL is not configured.");
+    return;
+  }
+
+  await hideLegacyReplyKeyboard(ctx);
+  await ctx.reply("Hello! Open the app:", startKeyboard);
+};
 
 if (bot) {
-  bot.start(async (ctx) => ctx.reply("Семейный бот — выберите раздел:", menu()));
-  bot.hears(/меню|menu|главное/i, async (ctx) => ctx.reply("Меню:", menu()));
+  if (webAppUrl) {
+    void bot.telegram
+      .setChatMenuButton({
+        menuButton: {
+          type: "web_app",
+          text: "Open the app",
+          web_app: {
+            url: webAppUrl,
+          },
+        },
+      })
+      .catch((error) => {
+        logger.error("MenuButtonError", error);
+      });
+  }
+
+  bot.start(sendWebAppEntry);
+  bot.hears(/меню|menu|главное/i, sendWebAppEntry);
 }
 
 export const telegramBot = onRequest({ cors: true }, async (req, res) => {
