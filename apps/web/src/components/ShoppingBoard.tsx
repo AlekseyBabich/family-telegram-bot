@@ -20,22 +20,68 @@ interface ShoppingModalState {
   title: string;
 }
 
-const createInitialItems = (columnIndex: number): ShoppingItem[] =>
-  sortItems(
-    Array.from({ length: 20 }, (_, index) => {
-      const id = `list-${columnIndex + 1}-item-${index + 1}`;
-      const title = `Продукт ${index + 1}`;
-      const done = (index + columnIndex) % 3 === 0 || index % 5 === 0;
+const createInitialColumns = (): ShoppingColumn[] => {
+  const columnConfigs: Array<{ id: string; title: string; items: string[] }> = [
+    {
+      id: 'list-1',
+      title: 'Еда',
+      items: [
+        'Хлеб',
+        'Батон',
+        'Молоко',
+        'Масло',
+        'Сметана',
+        'Йогурт дет.',
+        'Йогурт взр.',
+        'Фрукты',
+        'Колбаса вар.',
+        'Колбаса коп.',
+        'Сыр затирка',
+        'Сыр вкусный',
+        'Сыр плавленый',
+        'Том. паста',
+        'Аджика',
+        'Майонез',
+        'Кетчуп',
+        'Печенье',
+        'Пряники',
+        'Конфеты',
+      ],
+    },
+    {
+      id: 'list-2',
+      title: 'Бытовое',
+      items: [
+        'Бумага туалет.',
+        'Освежитель воз.',
+        'Бумаж. салф.',
+        'Мыло для рук',
+        'Мыло хоз.',
+        'Доместос',
+        'Чистка ванны',
+        'Ср. для мытья посуды',
+        'Губки',
+      ],
+    },
+    {
+      id: 'list-3',
+      title: 'Вещи',
+      items: ['Трусы', 'Носки', 'Куртка', 'Кроссовки'],
+    },
+  ];
 
-      return { id, title, done };
-    })
-  );
-
-const createInitialColumns = (): ShoppingColumn[] => [
-  { id: 'list-1', title: 'Список 1', items: createInitialItems(0) },
-  { id: 'list-2', title: 'Список 2', items: createInitialItems(1) },
-  { id: 'list-3', title: 'Список 3', items: createInitialItems(2) },
-];
+  return columnConfigs.map(({ id, title, items }) => ({
+    id,
+    title,
+    items: sortItems(
+      items.map((itemTitle, index) => ({
+        id: `${id}-item-${index + 1}`,
+        title: itemTitle,
+        done: false,
+      }))
+    ),
+  }));
+};
 
 const ShoppingBoard = () => {
   const [columns, setColumns] = useState<ShoppingColumn[]>(() => createInitialColumns());
