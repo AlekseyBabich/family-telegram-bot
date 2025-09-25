@@ -90,6 +90,26 @@ body.tg-theme-dark {
   gap: 16px;
 }
 
+.toast {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  margin-bottom: 12px;
+  border: 1px solid transparent;
+}
+
+.toast-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+body.tg-theme-dark .toast-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
 .section-card {
   background: var(--card-bg);
   border-radius: 16px;

@@ -90,3 +90,8 @@ https://api.telegram.org/bot<ВАШ_BOT_TOKEN>/setWebhook?url=https://<firebase-
 
 ## Как вернуться к CI/CD
 Для возврата к автоматическим деплоям необходимо снова включить биллинг в Firebase и восстановить GitHub Actions workflows (`.github/workflows`). После этого можно настроить токены и секреты для сервис-аккаунта, чтобы автоматические пайплайны снова запускались при пушах в основную ветку.
+
+## Проверка формы покупок
+1. Выполните `npm --workspace apps/web run dev` и откройте `http://localhost:5173/#/shopping` либо перейдите на продакшн-URL `https://family-bot-33940.web.app/#/shopping`.
+2. Авторизуйтесь через Telegram WebApp (при локальном запуске используйте встроенный мини-апп Telegram в браузере).
+3. Введите название покупки и нажмите «Добавить». Элемент появится в соответствующей категории, а в Firestore создастся документ по пути `families/default/lists/shopping/items` с полями `title`, `done`, `createdAt`, `addedBy`.
