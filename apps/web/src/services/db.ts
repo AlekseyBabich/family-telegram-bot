@@ -7,7 +7,6 @@ import {
   getDocs,
   limit,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
   updateDoc,
@@ -18,13 +17,20 @@ import type { BasicUser } from './auth';
 
 export type ShoppingCategory = 'food' | 'household' | 'clothes';
 
+export interface ShoppingItemContributor {
+  id: number;
+  name: string;
+  username?: string | null;
+}
+
 export interface ShoppingItem {
   id: string;
-  text: string;
+  title: string;
   category: ShoppingCategory;
-  isDone: boolean;
+  done: boolean;
   createdAt: Date | null;
   updatedAt: Date | null;
+  addedBy?: ShoppingItemContributor | null;
 }
 
 export interface CalendarEvent {
@@ -57,31 +63,47 @@ export const subscribeShoppingByCategory = (
   category: ShoppingCategory,
   callback: (items: ShoppingItem[]) => void
 ) => {
-  const shoppingRef = collection(db, 'shopping');
-  const q = query(
-    shoppingRef,
-    where('category', '==', category),
-    orderBy('createdAt', 'desc')
+  const shoppingRef = collection(
+    db,
+    'families',
+    'default',
+    'lists',
+    'shopping',
+    'items'
   );
+  const q = query(shoppingRef, where('category', '==', category));
 
   return onSnapshot(q, (snapshot) => {
     const items = snapshot.docs.map((docSnap) => {
       const data = docSnap.data() as {
-        text: string;
+        title: string;
         category: ShoppingCategory;
-        isDone: boolean;
+        done: boolean;
         createdAt?: Timestamp;
         updatedAt?: Timestamp;
+        addedBy?: ShoppingItemContributor | null;
       };
 
       return {
         id: docSnap.id,
-        text: data.text,
+        title: data.title,
         category: data.category,
-        isDone: data.isDone,
+        done: data.done,
         createdAt: toDate(data.createdAt ?? null),
-        updatedAt: toDate(data.updatedAt ?? null)
+        updatedAt: toDate(data.updatedAt ?? null),
+        addedBy: data.addedBy ?? null
       } satisfies ShoppingItem;
+    });
+
+    items.sort((a, b) => {
+      if (a.done !== b.done) {
+        return a.done ? 1 : -1;
+      }
+
+      const aTime = a.createdAt?.getTime() ?? 0;
+      const bTime = b.createdAt?.getTime() ?? 0;
+
+      return bTime - aTime;
     });
 
     callback(items);
@@ -93,31 +115,63 @@ export const addShoppingItem = async (
   text: string,
   user: BasicUser | null
 ) => {
-  const shoppingRef = collection(db, 'shopping');
+  const shoppingRef = collection(
+    db,
+    'families',
+    'default',
+    'lists',
+    'shopping',
+    'items'
+  );
   const payload = {
     category,
-    text,
-    isDone: false,
+    title: text,
+    done: false,
     createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    updatedAt: serverTimestamp(),
+    ...(user
+      ? {
+          addedBy: {
+            id: user.id,
+            name: user.name,
+            username: user.username ?? null
+          } satisfies ShoppingItemContributor
+        }
+      : {})
   };
 
   const newDoc = await addDoc(shoppingRef, payload);
-  await logAction(user, 'shopping:add', { id: newDoc.id, category, text });
+  await logAction(user, 'shopping:add', { id: newDoc.id, category, title: text });
 };
 
 export const toggleShoppingItem = async (
   id: string,
-  isDone: boolean,
+  done: boolean,
   user: BasicUser | null
 ) => {
-  const itemRef = doc(db, 'shopping', id);
-  await updateDoc(itemRef, { isDone, updatedAt: serverTimestamp() });
-  await logAction(user, 'shopping:update', { id, isDone });
+  const itemRef = doc(
+    db,
+    'families',
+    'default',
+    'lists',
+    'shopping',
+    'items',
+    id
+  );
+  await updateDoc(itemRef, { done, updatedAt: serverTimestamp() });
+  await logAction(user, 'shopping:update', { id, done });
 };
 
 export const deleteShoppingItem = async (id: string, user: BasicUser | null) => {
-  const itemRef = doc(db, 'shopping', id);
+  const itemRef = doc(
+    db,
+    'families',
+    'default',
+    'lists',
+    'shopping',
+    'items',
+    id
+  );
   await deleteDoc(itemRef);
   await logAction(user, 'shopping:delete', { id });
 };

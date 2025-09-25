@@ -20,6 +20,7 @@ export const TEXT = {
     addPlaceholder: 'Добавить...',
     addButton: 'Добавить',
     empty: 'Пока пусто',
+    genericError: 'Не удалось сохранить покупку. Попробуйте ещё раз.',
     deleteConfirm: (name: string) => `Удалить «${name}»?`,
     toggleDone: {
       done: 'Отметить выполненным',
