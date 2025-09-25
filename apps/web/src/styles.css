@@ -239,6 +239,18 @@ body.tg-theme-dark .toast-error {
   background: rgba(148, 163, 184, 0.12);
   font-size: 13px;
   min-height: 32px;
+  cursor: pointer;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.shopping-item:hover {
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.shopping-item:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
 .shopping-item-icon {
