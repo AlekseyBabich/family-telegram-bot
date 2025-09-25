@@ -1,5 +1,6 @@
-import { KeyboardEvent, useState } from 'react';
+import { KeyboardEvent, useMemo, useRef, useState } from 'react';
 import ShoppingModal from './ShoppingModal';
+import ShoppingPager, { type ShoppingPagerColumn } from './ShoppingPager';
 import { sortItems } from '../utils/sort';
 
 interface ShoppingItem {
@@ -84,17 +85,31 @@ const createInitialColumns = (): ShoppingColumn[] => {
 };
 
 const ShoppingBoard = () => {
-  const [columns, setColumns] = useState<ShoppingColumn[]>(() => createInitialColumns());
+  const initialColumnsRef = useRef<ShoppingColumn[]>(createInitialColumns());
+  const [columns, setColumns] = useState<ShoppingColumn[]>(() => initialColumnsRef.current);
+  const [activeListId, setActiveListId] = useState<string>(
+    () => initialColumnsRef.current[0]?.id ?? 'list-1'
+  );
   const [modalState, setModalState] = useState<ShoppingModalState>({
     isOpen: false,
-    listId: 'list-1',
+    listId: initialColumnsRef.current[0]?.id ?? 'list-1',
     title: '',
   });
+
+  const pagerColumns: ShoppingPagerColumn[] = useMemo(
+    () =>
+      columns.map((column) => ({
+        id: column.id,
+        title: column.title,
+        items: column.items,
+      })),
+    [columns]
+  );
 
   const openModal = () => {
     setModalState({
       isOpen: true,
-      listId: columns[0]?.id ?? 'list-1',
+      listId: activeListId ?? columns[0]?.id ?? 'list-1',
       title: '',
     });
   };
@@ -113,6 +128,23 @@ const ShoppingBoard = () => {
         const updatedItems = column.items.map((item) =>
           item.id === itemId ? { ...item, done: !item.done } : item
         );
+
+        return {
+          ...column,
+          items: sortItems(updatedItems),
+        };
+      })
+    );
+  };
+
+  const deleteItem = (columnId: string, itemId: string) => {
+    setColumns((prevColumns) =>
+      prevColumns.map((column) => {
+        if (column.id !== columnId) {
+          return column;
+        }
+
+        const updatedItems = column.items.filter((item) => item.id !== itemId);
 
         return {
           ...column,
@@ -190,6 +222,17 @@ const ShoppingBoard = () => {
           </div>
         ))}
       </div>
+
+      <ShoppingPager
+        columns={pagerColumns}
+        activeColumnId={activeListId}
+        onActiveColumnChange={(columnId) => {
+          setActiveListId(columnId);
+          setModalState((state) => ({ ...state, listId: columnId }));
+        }}
+        onToggleItem={toggleItem}
+        onDeleteItem={deleteItem}
+      />
 
       <button type="button" className="shopping-add-button" onClick={openModal}>
         Добавить

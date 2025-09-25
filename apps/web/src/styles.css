@@ -204,6 +204,34 @@ body.tg-theme-dark .toast-error {
   align-items: start;
 }
 
+@media (max-width: 767px) {
+  .shopping-columns {
+    display: none;
+  }
+}
+
+.shopping-mobile {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .shopping-board {
+    gap: 12px;
+  }
+
+  .shopping-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+@media (min-width: 768px) {
+  .shopping-mobile {
+    display: none;
+  }
+}
+
 .shopping-column {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
@@ -247,6 +275,10 @@ body.tg-theme-dark .toast-error {
   background: rgba(148, 163, 184, 0.18);
 }
 
+.shopping-item:active {
+  background: rgba(148, 163, 184, 0.22);
+}
+
 .shopping-item:focus-visible {
   outline: 2px solid var(--accent-color);
   outline-offset: 2px;
@@ -272,6 +304,105 @@ body.tg-theme-dark .toast-error {
 .shopping-item-title {
   flex: 1;
   line-height: 1.2;
+}
+
+.shopping-tabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.shopping-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-color);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.shopping-tab.active {
+  background: var(--accent-color);
+  color: #fff;
+  border-color: var(--accent-color);
+}
+
+.shopping-pager {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+  touch-action: pan-y;
+}
+
+.shopping-pager-pages {
+  display: flex;
+  width: 100%;
+  touch-action: pan-y;
+}
+
+.shopping-pager-page {
+  flex: 0 0 100%;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.shopping-indicators {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.shopping-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.4);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.shopping-indicator.active {
+  background: var(--accent-color);
+  transform: scale(1.15);
+}
+
+.shopping-popover {
+  position: fixed;
+  z-index: 1200;
+  min-width: 120px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.15);
+  padding: 6px;
+  transform: translateY(-50%);
+}
+
+.shopping-popover-action {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.shopping-popover-action:hover,
+.shopping-popover-action:focus-visible {
+  background: rgba(239, 68, 68, 0.18);
+  outline: none;
+}
+
+.shopping-popover-action:active {
+  background: rgba(239, 68, 68, 0.24);
 }
 
 .shopping-add-button {
