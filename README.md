@@ -55,6 +55,17 @@ https://api.telegram.org/bot<ВАШ_BOT_TOKEN>/setWebhook?url=https://<firebase-
 ```
 Замените `<firebase-region>` на регион развёртывания функций и `<project>` на идентификатор проекта (например, `family-bot-33940`).
 
+## Локальная разработка с туннелем
+Для локальной отладки можно пробрасывать публичный HTTPS-туннель на Express-сервер бота. Продакшн-вебхук остаётся настроенным на Firebase Functions (см. раздел выше).
+
+1. Скопируйте `.env.example` в `.env.local` в корне репозитория и заполните хотя бы `BOT_TOKEN` (остальные переменные также можно указать для корректной работы бота).
+2. Установите любой поддерживаемый туннель: [ngrok](https://ngrok.com/download) (предпочтительно) или [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/).
+3. Запустите скрипт `scripts/dev_local_start.cmd`. Он поднимет `npm --workspace apps/bot run start`, найдёт доступный туннель и автоматически вызовет `setWebhook` на адрес вида `<туннель>/telegram/webhook`.
+4. Скрипт напечатает текущий URL из `getWebhookInfo` для проверки. Адрес туннеля меняется при каждом запуске, поэтому вебхук обновляется автоматически.
+5. После завершения работы выполните `scripts/dev_local_stop.cmd`. Он очистит вебхук и остановит процессы туннеля и локального бота.
+
+> ⚠️ Если ни один туннель не найден, скрипт подскажет, как установить ngrok или cloudflared.
+
 ## Частые проблемы
 - Не установлены `firebase-tools`: проверьте доступность команды `firebase --version`.
 - Проект Firebase не выбран: выполните `firebase use family-bot-33940`.
