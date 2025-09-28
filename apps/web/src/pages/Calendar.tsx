@@ -1,15 +1,8 @@
-import CalendarList from '../components/CalendarList';
-import type { BasicUser } from '../services/auth';
-
-interface CalendarPageProps {
-  user: BasicUser | null;
-}
-
-const Calendar = ({ user }: CalendarPageProps) => {
+const Calendar = () => {
   return (
-    <div className="page calendar-page">
-      <CalendarList user={user} />
-    </div>
+    <section className="centered-page">
+      <h1 className="page-title">Календарь</h1>
+    </section>
   );
 };
 
