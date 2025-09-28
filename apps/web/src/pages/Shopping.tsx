@@ -7,6 +7,10 @@ type ShoppingListData = {
   items: string[];
 };
 
+type ShoppingListViewProps = ShoppingListData & {
+  showTitle?: boolean;
+};
+
 type ShoppingPagerProps = {
   lists: ShoppingListData[];
   currentIndex: number;
@@ -27,9 +31,9 @@ const LISTS: ShoppingListData[] = [
   { title: 'Вещи', items: createItems() }
 ];
 
-const ShoppingListView = ({ title, items }: ShoppingListData) => (
+const ShoppingListView = ({ title, items, showTitle = true }: ShoppingListViewProps) => (
   <div className="shopping-panel">
-    <h2 className="shopping-list-title">{title}</h2>
+    {showTitle ? <h2 className="shopping-list-title">{title}</h2> : null}
     <ul className="shopping-items">
       {items.map((item) => (
         <li key={`${title}-${item}`} className="shopping-item">
@@ -113,6 +117,11 @@ const ShoppingPager = ({ lists, currentIndex, onIndexChange }: ShoppingPagerProp
 
   const handlePointerDownCapture = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse') {
+      return;
+    }
+
+    const topNav = document.querySelector('.top-tabs');
+    if (topNav && topNav.contains(event.target as Node)) {
       return;
     }
 
@@ -217,6 +226,7 @@ const ShoppingPager = ({ lists, currentIndex, onIndexChange }: ShoppingPagerProp
       } catch (error) {
         // Ignore release errors
       }
+      state.hasPointerCapture = false;
     }
 
     if (!state.longPressActive && !state.isVerticalScroll) {
@@ -252,6 +262,7 @@ const ShoppingPager = ({ lists, currentIndex, onIndexChange }: ShoppingPagerProp
       } catch (error) {
         // Ignore release errors
       }
+      state.hasPointerCapture = false;
     }
 
     resetGestureState();
@@ -275,7 +286,7 @@ const ShoppingPager = ({ lists, currentIndex, onIndexChange }: ShoppingPagerProp
     >
       <div className="shopping-track" style={trackStyle}>
         {lists.map((list) => (
-          <ShoppingListView key={list.title} {...list} />
+          <ShoppingListView key={list.title} {...list} showTitle={false} />
         ))}
       </div>
     </div>
@@ -310,10 +321,14 @@ const Shopping = () => {
     }
   }, [isDesktop]);
 
+  const currentList = LISTS[currentIndex];
+
   return (
     <section className="shopping-page">
       <header className="shopping-header">
-        <h1 className="shopping-title">Покупки</h1>
+        {!isDesktop && (
+          <h1 className="shopping-current-title">{currentList.title}</h1>
+        )}
       </header>
       {isDesktop ? (
         <div className="shopping-desktop-grid" aria-label="Списки покупок">

@@ -7,12 +7,12 @@
 }
 
 .shopping-header {
-  padding: 24px 20px 0;
+  padding: 16px 20px 0;
 }
 
-.shopping-title {
+.shopping-current-title {
   margin: 0;
-  font-size: clamp(28px, 7vw, 34px);
+  font-size: clamp(24px, 6vw, 30px);
   font-weight: 700;
 }
 
@@ -108,11 +108,7 @@
   }
 
   .shopping-header {
-    padding: 0 0 24px;
-  }
-
-  .shopping-title {
-    font-size: 32px;
+    display: none;
   }
 
   .shopping-desktop-grid {

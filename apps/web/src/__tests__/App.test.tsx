@@ -11,9 +11,12 @@ describe('App routes', () => {
       </MemoryRouter>
     );
 
-  it('renders shopping page title', () => {
+  it('renders shopping current list heading', () => {
     renderWithRoute('/shopping');
-    expect(screen.getByRole('heading', { level: 1, name: 'Покупки' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Еда' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Покупки' })
+    ).not.toBeInTheDocument();
   });
 
   it('renders calendar page title', () => {
