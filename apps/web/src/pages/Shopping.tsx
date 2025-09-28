@@ -1,15 +1,8 @@
-import type { BasicUser } from '../services/auth';
-import ShoppingBoard from '../components/ShoppingBoard';
-
-interface ShoppingPageProps {
-  user: BasicUser | null;
-}
-
-const Shopping = ({ user: _user }: ShoppingPageProps) => {
+const Shopping = () => {
   return (
-    <div className="page shopping-page">
-      <ShoppingBoard />
-    </div>
+    <section className="centered-page">
+      <h1 className="page-title">Покупки</h1>
+    </section>
   );
 };
 

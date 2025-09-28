@@ -1,22 +1,36 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
-import Header from './components/Header';
-import Shopping from './pages/Shopping';
-import Calendar from './pages/Calendar';
+import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import Budget from './pages/Budget';
-import { useTelegramUser } from './services/auth';
+import Calendar from './pages/Calendar';
+import Shopping from './pages/Shopping';
+
+const tabs = [
+  { path: '/shopping', label: 'Покупки' },
+  { path: '/calendar', label: 'Календарь' },
+  { path: '/budget', label: 'Бюджет' }
+];
 
 const App = () => {
-  const user = useTelegramUser();
-
   return (
-    <div className="app-container">
-      <Header />
-      <main className="app-main">
+    <div className="app">
+      <nav className="top-tabs" aria-label="Основные разделы">
+        {tabs.map((tab) => (
+          <NavLink
+            key={tab.path}
+            to={tab.path}
+            className={({ isActive }) =>
+              `top-tab${isActive ? ' top-tab-active' : ''}`
+            }
+          >
+            {tab.label}
+          </NavLink>
+        ))}
+      </nav>
+      <main className="page-container">
         <Routes>
           <Route path="/" element={<Navigate to="/shopping" replace />} />
-          <Route path="/shopping" element={<Shopping user={user} />} />
-          <Route path="/calendar" element={<Calendar user={user} />} />
-          <Route path="/budget" element={<Budget user={user} />} />
+          <Route path="/shopping" element={<Shopping />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/budget" element={<Budget />} />
           <Route path="*" element={<Navigate to="/shopping" replace />} />
         </Routes>
       </main>
