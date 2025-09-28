@@ -10,7 +10,11 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "baseUrl": "./",
+    "paths": {
+      "react-swipeable": ["src/vendor/react-swipeable"]
+    }
   },
   "include": ["src"],
   "references": []
