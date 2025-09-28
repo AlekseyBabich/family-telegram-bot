@@ -77,7 +77,6 @@ type GestureState = {
 
 const ShoppingPager = ({ lists, currentIndex, onIndexChange }: ShoppingPagerProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const tabBarRef = useRef<HTMLDivElement | null>(null);
   const gestureStateRef = useRef<GestureState>({
     pointerId: null,
     startX: 0,
@@ -114,11 +113,6 @@ const ShoppingPager = ({ lists, currentIndex, onIndexChange }: ShoppingPagerProp
 
   const handlePointerDownCapture = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse') {
-      return;
-    }
-
-    const targetNode = event.target as Node | null;
-    if (targetNode && tabBarRef.current?.contains(targetNode)) {
       return;
     }
 
@@ -271,44 +265,20 @@ const ShoppingPager = ({ lists, currentIndex, onIndexChange }: ShoppingPagerProp
   );
 
   return (
-    <>
-      <div
-        ref={tabBarRef}
-        className="shopping-tabs"
-        role="tablist"
-        aria-label="Категории покупок"
-      >
-        {lists.map((list, index) => {
-          const isActive = index === currentIndex;
-          return (
-            <button
-              key={list.title}
-              type="button"
-              role="tab"
-              className={`shopping-tab${isActive ? ' shopping-tab-active' : ''}`}
-              aria-selected={isActive}
-              onClick={() => onIndexChange(index)}
-            >
-              {list.title}
-            </button>
-          );
-        })}
+    <div
+      ref={containerRef}
+      className="shopping-mobile"
+      onPointerDownCapture={handlePointerDownCapture}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerCancel}
+    >
+      <div className="shopping-track" style={trackStyle}>
+        {lists.map((list) => (
+          <ShoppingListView key={list.title} {...list} />
+        ))}
       </div>
-      <div
-        ref={containerRef}
-        className="shopping-mobile"
-        onPointerDownCapture={handlePointerDownCapture}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerCancel}
-      >
-        <div className="shopping-track" style={trackStyle}>
-          {lists.map((list) => (
-            <ShoppingListView key={list.title} {...list} />
-          ))}
-        </div>
-      </div>
-    </>
+    </div>
   );
 };
 
