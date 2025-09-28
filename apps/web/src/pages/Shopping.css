@@ -22,6 +22,8 @@
   display: flex;
   overflow: hidden;
   touch-action: pan-y;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .shopping-track {
@@ -65,6 +67,37 @@
   font-weight: 500;
 }
 
+.shopping-tabs {
+  display: flex;
+  gap: 10px;
+  padding: 0 20px 12px;
+}
+
+.shopping-tab {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--text-color);
+  font-size: clamp(14px, 3.8vw, 16px);
+  font-weight: 600;
+  text-align: center;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.shopping-tab:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.shopping-tab-active {
+  background: var(--accent-color);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
 .shopping-dots {
   display: flex;
   justify-content: center;
@@ -103,6 +136,10 @@
   .shopping-page {
     padding: 24px;
     background: transparent;
+  }
+
+  .shopping-tabs {
+    display: none;
   }
 
   .shopping-header {

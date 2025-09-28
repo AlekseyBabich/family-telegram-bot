@@ -61,72 +61,206 @@ const PageDots = ({ count, currentIndex, onSelect }: PageDotsProps) => {
 };
 
 const SWIPE_THRESHOLD = 12;
-const VERTICAL_CANCEL_THRESHOLD = 40;
+const LONG_PRESS_DURATION = 1000;
+
+type GestureState = {
+  pointerId: number | null;
+  startX: number;
+  startY: number;
+  startTime: number;
+  isSwiping: boolean;
+  isVerticalScroll: boolean;
+  longPressActive: boolean;
+  longPressTimeout: ReturnType<typeof setTimeout> | null;
+  hasPointerCapture: boolean;
+};
 
 const ShoppingPager = ({ lists, currentIndex, onIndexChange }: ShoppingPagerProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const startPointRef = useRef<{ x: number; y: number } | null>(null);
-  const allowSwipeRef = useRef(true);
+  const tabBarRef = useRef<HTMLDivElement | null>(null);
+  const gestureStateRef = useRef<GestureState>({
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startTime: 0,
+    isSwiping: false,
+    isVerticalScroll: false,
+    longPressActive: false,
+    longPressTimeout: null,
+    hasPointerCapture: false
+  });
 
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const target = event.currentTarget;
-    if (target.setPointerCapture) {
+  const resetGestureState = () => {
+    const state = gestureStateRef.current;
+    if (state.longPressTimeout) {
+      clearTimeout(state.longPressTimeout);
+      state.longPressTimeout = null;
+    }
+    state.pointerId = null;
+    state.startX = 0;
+    state.startY = 0;
+    state.startTime = 0;
+    state.isSwiping = false;
+    state.isVerticalScroll = false;
+    state.longPressActive = false;
+    state.hasPointerCapture = false;
+  };
+
+  useEffect(() => {
+    return () => {
+      resetGestureState();
+    };
+  }, []);
+
+  const handlePointerDownCapture = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'mouse') {
+      return;
+    }
+
+    const targetNode = event.target as Node | null;
+    if (targetNode && tabBarRef.current?.contains(targetNode)) {
+      return;
+    }
+
+    const state = gestureStateRef.current;
+    if (state.pointerId !== null) {
+      return;
+    }
+
+    const container = event.currentTarget;
+
+    state.pointerId = event.pointerId;
+    state.startX = event.clientX;
+    state.startY = event.clientY;
+    state.startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    state.isSwiping = false;
+    state.isVerticalScroll = false;
+    state.longPressActive = false;
+    state.longPressTimeout = setTimeout(() => {
+      const activeState = gestureStateRef.current;
+      if (activeState.pointerId !== event.pointerId) {
+        return;
+      }
+      activeState.longPressActive = true;
+      activeState.isSwiping = false;
+      activeState.isVerticalScroll = false;
+      activeState.longPressTimeout = null;
+    }, LONG_PRESS_DURATION);
+
+    if (container.setPointerCapture) {
       try {
-        target.setPointerCapture(event.pointerId);
+        container.setPointerCapture(event.pointerId);
+        state.hasPointerCapture = true;
       } catch (error) {
-        // Ignore if pointer capture is not supported
+        state.hasPointerCapture = false;
       }
     }
-    startPointRef.current = { x: event.clientX, y: event.clientY };
-    allowSwipeRef.current = true;
+  };
+
+  const cancelLongPressTimer = () => {
+    const state = gestureStateRef.current;
+    if (state.longPressTimeout) {
+      clearTimeout(state.longPressTimeout);
+      state.longPressTimeout = null;
+    }
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!startPointRef.current || !allowSwipeRef.current) {
+    if (event.pointerType === 'mouse') {
       return;
     }
-    const deltaX = event.clientX - startPointRef.current.x;
-    const deltaY = event.clientY - startPointRef.current.y;
-    if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > SWIPE_THRESHOLD) {
-      allowSwipeRef.current = false;
+
+    const state = gestureStateRef.current;
+    if (state.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (state.longPressActive) {
+      event.preventDefault();
+      return;
+    }
+
+    const deltaX = event.clientX - state.startX;
+    const deltaY = event.clientY - state.startY;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+
+    if (state.longPressTimeout && (absDeltaX >= SWIPE_THRESHOLD || absDeltaY >= SWIPE_THRESHOLD)) {
+      cancelLongPressTimer();
+    }
+
+    if (!state.isSwiping && !state.isVerticalScroll) {
+      if (absDeltaX >= SWIPE_THRESHOLD && absDeltaX > absDeltaY) {
+        state.isSwiping = true;
+        event.preventDefault();
+      } else if (absDeltaY >= SWIPE_THRESHOLD && absDeltaY > absDeltaX) {
+        state.isVerticalScroll = true;
+      }
+      return;
+    }
+
+    if (state.isSwiping) {
+      event.preventDefault();
     }
   };
 
-  const finishSwipe = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!startPointRef.current) {
+  const handlePointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'mouse') {
       return;
     }
 
-    const deltaX = event.clientX - startPointRef.current.x;
-    const deltaY = event.clientY - startPointRef.current.y;
+    const state = gestureStateRef.current;
+    if (state.pointerId !== event.pointerId) {
+      return;
+    }
 
-    const target = event.currentTarget;
-    if (target.releasePointerCapture) {
+    cancelLongPressTimer();
+
+    const container = event.currentTarget;
+    if (state.hasPointerCapture && container.releasePointerCapture) {
       try {
-        target.releasePointerCapture(event.pointerId);
+        container.releasePointerCapture(event.pointerId);
       } catch (error) {
-        // Ignore if pointer capture is not supported
+        // Ignore release errors
       }
     }
 
-    startPointRef.current = null;
+    if (!state.longPressActive && !state.isVerticalScroll) {
+      const deltaX = event.clientX - state.startX;
+      const deltaY = event.clientY - state.startY;
+      const absDeltaX = Math.abs(deltaX);
+      const absDeltaY = Math.abs(deltaY);
 
-    if (!allowSwipeRef.current) {
+      if (absDeltaX >= SWIPE_THRESHOLD && absDeltaX > absDeltaY) {
+        if (deltaX < 0) {
+          onIndexChange(Math.min(lists.length - 1, currentIndex + 1));
+        } else if (deltaX > 0) {
+          onIndexChange(Math.max(0, currentIndex - 1));
+        }
+      }
+    }
+
+    resetGestureState();
+  };
+
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = gestureStateRef.current;
+    if (state.pointerId !== event.pointerId) {
       return;
     }
 
-    if (Math.abs(deltaX) >= SWIPE_THRESHOLD && Math.abs(deltaY) < VERTICAL_CANCEL_THRESHOLD) {
-      if (deltaX < 0) {
-        onIndexChange(Math.min(lists.length - 1, currentIndex + 1));
-      } else if (deltaX > 0) {
-        onIndexChange(Math.max(0, currentIndex - 1));
+    cancelLongPressTimer();
+
+    const container = event.currentTarget;
+    if (state.hasPointerCapture && container.releasePointerCapture) {
+      try {
+        container.releasePointerCapture(event.pointerId);
+      } catch (error) {
+        // Ignore release errors
       }
     }
-  };
 
-  const handlePointerCancel = () => {
-    startPointRef.current = null;
-    allowSwipeRef.current = true;
+    resetGestureState();
   };
 
   const trackStyle = useMemo(
@@ -137,20 +271,44 @@ const ShoppingPager = ({ lists, currentIndex, onIndexChange }: ShoppingPagerProp
   );
 
   return (
-    <div
-      ref={containerRef}
-      className="shopping-mobile"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={finishSwipe}
-      onPointerCancel={handlePointerCancel}
-    >
-      <div className="shopping-track" style={trackStyle}>
-        {lists.map((list) => (
-          <ShoppingListView key={list.title} {...list} />
-        ))}
+    <>
+      <div
+        ref={tabBarRef}
+        className="shopping-tabs"
+        role="tablist"
+        aria-label="Категории покупок"
+      >
+        {lists.map((list, index) => {
+          const isActive = index === currentIndex;
+          return (
+            <button
+              key={list.title}
+              type="button"
+              role="tab"
+              className={`shopping-tab${isActive ? ' shopping-tab-active' : ''}`}
+              aria-selected={isActive}
+              onClick={() => onIndexChange(index)}
+            >
+              {list.title}
+            </button>
+          );
+        })}
       </div>
-    </div>
+      <div
+        ref={containerRef}
+        className="shopping-mobile"
+        onPointerDownCapture={handlePointerDownCapture}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerCancel}
+      >
+        <div className="shopping-track" style={trackStyle}>
+          {lists.map((list) => (
+            <ShoppingListView key={list.title} {...list} />
+          ))}
+        </div>
+      </div>
+    </>
   );
 };
 
