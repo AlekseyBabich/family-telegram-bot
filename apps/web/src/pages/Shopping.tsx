@@ -99,9 +99,41 @@ const Shopping = () => {
     setCurrentIndex((index) => Math.max(0, index - 1));
   }, []);
 
+  const isSwipeDebugEnabled = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return new URLSearchParams(window.location.search).get('debugSwipe') === '1';
+  }, []);
+
   const swipeHandlers = useSwipeable({
+    onSwipeStart: (eventData) => {
+      if (!isSwipeDebugEnabled) {
+        return;
+      }
+
+      const target = eventData.event?.target as HTMLElement | null;
+      console.log('[shopping] swipe start', target?.tagName ?? 'unknown', eventData);
+    },
+    onSwiping: (eventData) => {
+      if (!isSwipeDebugEnabled) {
+        return;
+      }
+
+      const target = eventData.event?.target as HTMLElement | null;
+      console.log('[shopping] swiping', target?.tagName ?? 'unknown', eventData.dir);
+    },
     onSwipedLeft: () => goToNextPage(),
     onSwipedRight: () => goToPrevPage(),
+    onSwiped: (eventData) => {
+      if (!isSwipeDebugEnabled) {
+        return;
+      }
+
+      const target = eventData.event?.target as HTMLElement | null;
+      console.log('[shopping] swiped', target?.tagName ?? 'unknown', eventData.dir, eventData);
+    },
     delta: 12,
     preventScrollOnSwipe: true,
     trackTouch: true,
@@ -131,10 +163,7 @@ const Shopping = () => {
   const currentList = LISTS[currentIndex];
 
   return (
-    <section
-      className="shopping-page"
-      {...(!isDesktop ? swipeHandlers : {})}
-    >
+    <section className="shopping-page">
       <header className="shopping-header">
         {!isDesktop && (
           <h1 className="shopping-current-title">{currentList.title}</h1>
@@ -147,13 +176,13 @@ const Shopping = () => {
           ))}
         </div>
       ) : (
-        <>
+        <div className="shopping-content" {...swipeHandlers}>
           <ShoppingPager
             lists={LISTS}
             currentIndex={currentIndex}
           />
           <PageDots count={LISTS.length} currentIndex={currentIndex} onSelect={setCurrentIndex} />
-        </>
+        </div>
       )}
     </section>
   );
