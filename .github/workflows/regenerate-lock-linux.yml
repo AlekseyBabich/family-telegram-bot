@@ -1,0 +1,37 @@
+name: Regenerate lockfile on Linux
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to update'
+        required: true
+        default: 'codex/replace-custom-swipe-with-react-swipeable'
+
+permissions:
+  contents: write
+
+jobs:
+  regen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Regenerate root lockfile (workspaces)
+        run: |
+          rm -f package-lock.json
+          npm install --workspaces
+
+      - name: Commit updated lockfile
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: regenerate root package-lock.json on Linux for rollup platform bins"
+          file_pattern: "package-lock.json"
