@@ -72,11 +72,30 @@
 }
 
 .shopping-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 14px 16px;
   border-radius: 16px;
   background: var(--surface-color);
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
   font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+.shopping-item:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 3px;
+}
+
+.shopping-item-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.shopping-item-title {
+  flex: 1;
 }
 
 .shopping-dots {

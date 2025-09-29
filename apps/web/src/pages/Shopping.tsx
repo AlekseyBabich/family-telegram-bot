@@ -1,19 +1,27 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import './Shopping.css';
 
+type CheckItem = {
+  id: string;
+  title: string;
+  done: boolean;
+};
+
 type ShoppingListData = {
   title: string;
-  items: string[];
+  items: CheckItem[];
 };
 
 type ShoppingListViewProps = ShoppingListData & {
   showTitle?: boolean;
+  onToggle: (itemId: string) => void;
 };
 
 type ShoppingPagerProps = {
   lists: ShoppingListData[];
   currentIndex: number;
+  onToggle: (listIndex: number, itemId: string) => void;
 };
 
 type PageDotsProps = {
@@ -22,23 +30,48 @@ type PageDotsProps = {
   onSelect: (index: number) => void;
 };
 
-const createItems = () => Array.from({ length: 10 }, (_, index) => `Пункт ${index + 1}`);
+const createItems = (prefix: string): CheckItem[] =>
+  Array.from({ length: 10 }, (_, index) => ({
+    id: `${prefix}-${index + 1}`,
+    title: `Пункт ${index + 1}`,
+    done: false
+  }));
 
-const LISTS: ShoppingListData[] = [
-  { title: 'Еда', items: createItems() },
-  { title: 'Бытовое', items: createItems() },
-  { title: 'Вещи', items: createItems() }
+const createInitialLists = (): ShoppingListData[] => [
+  { title: 'Еда', items: createItems('food') },
+  { title: 'Бытовое', items: createItems('household') },
+  { title: 'Вещи', items: createItems('things') }
 ];
 
-const ShoppingListView = ({ title, items, showTitle = true }: ShoppingListViewProps) => (
+const ShoppingListView = ({ title, items, showTitle = true, onToggle }: ShoppingListViewProps) => (
   <div className="shopping-panel">
     {showTitle ? <h2 className="shopping-list-title">{title}</h2> : null}
     <ul className="shopping-items">
-      {items.map((item) => (
-        <li key={`${title}-${item}`} className="shopping-item">
-          {item}
-        </li>
-      ))}
+      {items.map((item) => {
+        const handleKeyDown = (event: KeyboardEvent<HTMLLIElement>) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onToggle(item.id);
+          }
+        };
+
+        return (
+          <li
+            key={item.id}
+            className="shopping-item"
+            role="button"
+            tabIndex={0}
+            aria-pressed={item.done}
+            onClick={() => onToggle(item.id)}
+            onKeyDown={handleKeyDown}
+          >
+            <span className="shopping-item-icon" aria-hidden="true">
+              {item.done ? '✅' : '❌'}
+            </span>
+            <span className="shopping-item-title">{item.title}</span>
+          </li>
+        );
+      })}
     </ul>
   </div>
 );
@@ -63,7 +96,7 @@ const PageDots = ({ count, currentIndex, onSelect }: PageDotsProps) => {
   );
 };
 
-const ShoppingPager = ({ lists, currentIndex }: ShoppingPagerProps) => {
+const ShoppingPager = ({ lists, currentIndex, onToggle }: ShoppingPagerProps) => {
   const trackStyle = useMemo(
     () => ({
       transform: `translateX(-${currentIndex * 100}%)`
@@ -74,8 +107,13 @@ const ShoppingPager = ({ lists, currentIndex }: ShoppingPagerProps) => {
   return (
     <div className="shopping-mobile">
       <div className="shopping-track" style={trackStyle}>
-        {lists.map((list) => (
-          <ShoppingListView key={list.title} {...list} showTitle={false} />
+        {lists.map((list, index) => (
+          <ShoppingListView
+            key={list.title}
+            {...list}
+            showTitle={false}
+            onToggle={(itemId) => onToggle(index, itemId)}
+          />
         ))}
       </div>
     </div>
@@ -83,6 +121,9 @@ const ShoppingPager = ({ lists, currentIndex }: ShoppingPagerProps) => {
 };
 
 const Shopping = () => {
+  const [lists, setLists] = useState<ShoppingListData[]>(() => createInitialLists());
+  const listCount = lists.length;
+
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -92,11 +133,33 @@ const Shopping = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const goToNextPage = useCallback(() => {
-    setCurrentIndex((index) => Math.min(LISTS.length - 1, index + 1));
-  }, []);
+    setCurrentIndex((index) => Math.min(Math.max(listCount - 1, 0), index + 1));
+  }, [listCount]);
 
   const goToPrevPage = useCallback(() => {
     setCurrentIndex((index) => Math.max(0, index - 1));
+  }, []);
+
+  const handleToggleItem = useCallback((listIndex: number, itemId: string) => {
+    setLists((prevLists) =>
+      prevLists.map((list, index) => {
+        if (index !== listIndex) {
+          return list;
+        }
+
+        return {
+          ...list,
+          items: list.items.map((item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  done: !item.done
+                }
+              : item
+          )
+        };
+      })
+    );
   }, []);
 
   const isSwipeDebugEnabled = useMemo(() => {
@@ -160,7 +223,11 @@ const Shopping = () => {
     }
   }, [isDesktop]);
 
-  const currentList = LISTS[currentIndex];
+  const currentList = lists[currentIndex] ?? lists[0];
+
+  if (!currentList) {
+    return null;
+  }
 
   return (
     <section className="shopping-page">
@@ -171,17 +238,22 @@ const Shopping = () => {
       </header>
       {isDesktop ? (
         <div className="shopping-desktop-grid" aria-label="Списки покупок">
-          {LISTS.map((list) => (
-            <ShoppingListView key={list.title} {...list} />
+          {lists.map((list, index) => (
+            <ShoppingListView
+              key={list.title}
+              {...list}
+              onToggle={(itemId) => handleToggleItem(index, itemId)}
+            />
           ))}
         </div>
       ) : (
         <div className="shopping-content" {...swipeHandlers}>
           <ShoppingPager
-            lists={LISTS}
+            lists={lists}
             currentIndex={currentIndex}
+            onToggle={handleToggleItem}
           />
-          <PageDots count={LISTS.length} currentIndex={currentIndex} onSelect={setCurrentIndex} />
+          <PageDots count={listCount} currentIndex={currentIndex} onSelect={setCurrentIndex} />
         </div>
       )}
     </section>
