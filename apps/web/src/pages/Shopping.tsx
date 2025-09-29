@@ -58,17 +58,17 @@ const ShoppingListView = ({ title, items, showTitle = true, onToggle }: Shopping
         return (
           <li
             key={item.id}
-            className="shopping-item"
+            className="check-item"
             role="button"
             tabIndex={0}
             aria-pressed={item.done}
             onClick={() => onToggle(item.id)}
             onKeyDown={handleKeyDown}
           >
-            <span className="shopping-item-icon" aria-hidden="true">
+            <span className="check-item__icon" aria-hidden="true">
               {item.done ? '✅' : '❌'}
             </span>
-            <span className="shopping-item-title">{item.title}</span>
+            <span className="check-item__title">{item.title}</span>
           </li>
         );
       })}
