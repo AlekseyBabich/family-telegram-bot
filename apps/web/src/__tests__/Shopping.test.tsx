@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 
 const setViewportWidth = (width: number) => {
@@ -55,5 +55,84 @@ describe('Shopping page responsive behaviour', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Бытовое' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Вещи' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Перейти к списку/i })).not.toBeInTheDocument();
+  });
+
+  it('renders checklist items with emoji icons that toggle on click', () => {
+    render(
+      <MemoryRouter initialEntries={["/shopping"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    const allItems = screen.getAllByRole('button', { name: /Пункт/ });
+    expect(allItems).toHaveLength(30);
+    allItems.forEach((item) => {
+      expect(item).toHaveTextContent('❌');
+      expect(item).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    const firstList = screen.getAllByRole('list')[0];
+    const firstItem = within(firstList).getByRole('button', { name: 'Пункт 1' });
+
+    fireEvent.click(firstItem);
+    expect(firstItem).toHaveTextContent('✅');
+    expect(firstItem).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(firstItem);
+    expect(firstItem).toHaveTextContent('❌');
+    expect(firstItem).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('never applies strikethrough styling to checklist text', () => {
+    render(
+      <MemoryRouter initialEntries={["/shopping"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    const firstList = screen.getAllByRole('list')[0];
+    const firstItem = within(firstList).getByRole('button', { name: 'Пункт 1' });
+
+    fireEvent.click(firstItem);
+
+    expect(firstItem).not.toHaveStyle({ textDecoration: 'line-through' });
+    expect(firstItem).not.toHaveStyle({ textDecorationLine: 'line-through' });
+  });
+
+  it('keeps swipe handlers attached without logging console errors', () => {
+    const originalHref = window.location.href;
+    window.history.pushState({}, '', '/shopping?debugSwipe=1');
+    setViewportWidth(500);
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(
+      <MemoryRouter initialEntries={["/shopping"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    const content = document.querySelector('.shopping-content') as HTMLElement | null;
+    expect(content).not.toBeNull();
+
+    if (content) {
+      fireEvent.touchStart(content, {
+        touches: [{ clientX: 10, clientY: 10 }]
+      });
+      fireEvent.touchMove(content, {
+        touches: [{ clientX: 60, clientY: 12 }]
+      });
+      fireEvent.touchEnd(content, {
+        changedTouches: [{ clientX: 60, clientY: 12 }]
+      });
+    }
+
+    expect(logSpy).toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    window.history.pushState({}, '', originalHref);
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 });
