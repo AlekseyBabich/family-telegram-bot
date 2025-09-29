@@ -1,5 +1,5 @@
-import type { PointerEvent as ReactPointerEvent } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSwipeable } from 'react-swipeable';
 import './Shopping.css';
 
 type ShoppingListData = {
@@ -14,7 +14,6 @@ type ShoppingListViewProps = ShoppingListData & {
 type ShoppingPagerProps = {
   lists: ShoppingListData[];
   currentIndex: number;
-  onIndexChange: (index: number) => void;
 };
 
 type PageDotsProps = {
@@ -64,210 +63,7 @@ const PageDots = ({ count, currentIndex, onSelect }: PageDotsProps) => {
   );
 };
 
-const SWIPE_THRESHOLD = 12;
-const LONG_PRESS_DURATION = 1000;
-
-type GestureState = {
-  pointerId: number | null;
-  startX: number;
-  startY: number;
-  startTime: number;
-  isSwiping: boolean;
-  isVerticalScroll: boolean;
-  longPressActive: boolean;
-  longPressTimeout: ReturnType<typeof setTimeout> | null;
-  hasPointerCapture: boolean;
-};
-
-const ShoppingPager = ({ lists, currentIndex, onIndexChange }: ShoppingPagerProps) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const gestureStateRef = useRef<GestureState>({
-    pointerId: null,
-    startX: 0,
-    startY: 0,
-    startTime: 0,
-    isSwiping: false,
-    isVerticalScroll: false,
-    longPressActive: false,
-    longPressTimeout: null,
-    hasPointerCapture: false
-  });
-
-  const resetGestureState = () => {
-    const state = gestureStateRef.current;
-    if (state.longPressTimeout) {
-      clearTimeout(state.longPressTimeout);
-      state.longPressTimeout = null;
-    }
-    state.pointerId = null;
-    state.startX = 0;
-    state.startY = 0;
-    state.startTime = 0;
-    state.isSwiping = false;
-    state.isVerticalScroll = false;
-    state.longPressActive = false;
-    state.hasPointerCapture = false;
-  };
-
-  useEffect(() => {
-    return () => {
-      resetGestureState();
-    };
-  }, []);
-
-  const handlePointerDownCapture = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === 'mouse') {
-      return;
-    }
-
-    const topNav = document.querySelector('.top-tabs');
-    if (topNav && topNav.contains(event.target as Node)) {
-      return;
-    }
-
-    const state = gestureStateRef.current;
-    if (state.pointerId !== null) {
-      return;
-    }
-
-    const container = event.currentTarget;
-
-    state.pointerId = event.pointerId;
-    state.startX = event.clientX;
-    state.startY = event.clientY;
-    state.startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    state.isSwiping = false;
-    state.isVerticalScroll = false;
-    state.longPressActive = false;
-    state.longPressTimeout = setTimeout(() => {
-      const activeState = gestureStateRef.current;
-      if (activeState.pointerId !== event.pointerId) {
-        return;
-      }
-      activeState.longPressActive = true;
-      activeState.isSwiping = false;
-      activeState.isVerticalScroll = false;
-      activeState.longPressTimeout = null;
-    }, LONG_PRESS_DURATION);
-
-    if (container.setPointerCapture) {
-      try {
-        container.setPointerCapture(event.pointerId);
-        state.hasPointerCapture = true;
-      } catch (error) {
-        state.hasPointerCapture = false;
-      }
-    }
-  };
-
-  const cancelLongPressTimer = () => {
-    const state = gestureStateRef.current;
-    if (state.longPressTimeout) {
-      clearTimeout(state.longPressTimeout);
-      state.longPressTimeout = null;
-    }
-  };
-
-  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === 'mouse') {
-      return;
-    }
-
-    const state = gestureStateRef.current;
-    if (state.pointerId !== event.pointerId) {
-      return;
-    }
-
-    if (state.longPressActive) {
-      event.preventDefault();
-      return;
-    }
-
-    const deltaX = event.clientX - state.startX;
-    const deltaY = event.clientY - state.startY;
-    const absDeltaX = Math.abs(deltaX);
-    const absDeltaY = Math.abs(deltaY);
-
-    if (state.longPressTimeout && (absDeltaX >= SWIPE_THRESHOLD || absDeltaY >= SWIPE_THRESHOLD)) {
-      cancelLongPressTimer();
-    }
-
-    if (!state.isSwiping && !state.isVerticalScroll) {
-      if (absDeltaX >= SWIPE_THRESHOLD && absDeltaX > absDeltaY) {
-        state.isSwiping = true;
-        event.preventDefault();
-      } else if (absDeltaY >= SWIPE_THRESHOLD && absDeltaY > absDeltaX) {
-        state.isVerticalScroll = true;
-      }
-      return;
-    }
-
-    if (state.isSwiping) {
-      event.preventDefault();
-    }
-  };
-
-  const handlePointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === 'mouse') {
-      return;
-    }
-
-    const state = gestureStateRef.current;
-    if (state.pointerId !== event.pointerId) {
-      return;
-    }
-
-    cancelLongPressTimer();
-
-    const container = event.currentTarget;
-    if (state.hasPointerCapture && container.releasePointerCapture) {
-      try {
-        container.releasePointerCapture(event.pointerId);
-      } catch (error) {
-        // Ignore release errors
-      }
-      state.hasPointerCapture = false;
-    }
-
-    if (!state.longPressActive && !state.isVerticalScroll) {
-      const deltaX = event.clientX - state.startX;
-      const deltaY = event.clientY - state.startY;
-      const absDeltaX = Math.abs(deltaX);
-      const absDeltaY = Math.abs(deltaY);
-
-      if (absDeltaX >= SWIPE_THRESHOLD && absDeltaX > absDeltaY) {
-        if (deltaX < 0) {
-          onIndexChange(Math.min(lists.length - 1, currentIndex + 1));
-        } else if (deltaX > 0) {
-          onIndexChange(Math.max(0, currentIndex - 1));
-        }
-      }
-    }
-
-    resetGestureState();
-  };
-
-  const handlePointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const state = gestureStateRef.current;
-    if (state.pointerId !== event.pointerId) {
-      return;
-    }
-
-    cancelLongPressTimer();
-
-    const container = event.currentTarget;
-    if (state.hasPointerCapture && container.releasePointerCapture) {
-      try {
-        container.releasePointerCapture(event.pointerId);
-      } catch (error) {
-        // Ignore release errors
-      }
-      state.hasPointerCapture = false;
-    }
-
-    resetGestureState();
-  };
-
+const ShoppingPager = ({ lists, currentIndex }: ShoppingPagerProps) => {
   const trackStyle = useMemo(
     () => ({
       transform: `translateX(-${currentIndex * 100}%)`
@@ -276,14 +72,7 @@ const ShoppingPager = ({ lists, currentIndex, onIndexChange }: ShoppingPagerProp
   );
 
   return (
-    <div
-      ref={containerRef}
-      className="shopping-mobile"
-      onPointerDownCapture={handlePointerDownCapture}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerCancel={handlePointerCancel}
-    >
+    <div className="shopping-mobile">
       <div className="shopping-track" style={trackStyle}>
         {lists.map((list) => (
           <ShoppingListView key={list.title} {...list} showTitle={false} />
@@ -301,6 +90,24 @@ const Shopping = () => {
     return window.innerWidth >= 768;
   });
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  const goToNextPage = useCallback(() => {
+    setCurrentIndex((index) => Math.min(LISTS.length - 1, index + 1));
+  }, []);
+
+  const goToPrevPage = useCallback(() => {
+    setCurrentIndex((index) => Math.max(0, index - 1));
+  }, []);
+
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => goToNextPage(),
+    onSwipedRight: () => goToPrevPage(),
+    delta: 12,
+    preventScrollOnSwipe: true,
+    trackTouch: true,
+    touchEventOptions: { passive: false },
+    rotationAngle: 0
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -324,7 +131,10 @@ const Shopping = () => {
   const currentList = LISTS[currentIndex];
 
   return (
-    <section className="shopping-page">
+    <section
+      className="shopping-page"
+      {...(!isDesktop ? swipeHandlers : {})}
+    >
       <header className="shopping-header">
         {!isDesktop && (
           <h1 className="shopping-current-title">{currentList.title}</h1>
@@ -341,7 +151,6 @@ const Shopping = () => {
           <ShoppingPager
             lists={LISTS}
             currentIndex={currentIndex}
-            onIndexChange={setCurrentIndex}
           />
           <PageDots count={LISTS.length} currentIndex={currentIndex} onSelect={setCurrentIndex} />
         </>
