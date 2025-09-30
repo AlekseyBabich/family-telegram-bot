@@ -1,51 +1,18 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type FormEvent,
-  type ChangeEvent,
-  type PointerEvent as ReactPointerEvent,
-  type MouseEvent as ReactMouseEvent,
-  type TouchEvent as ReactTouchEvent
-} from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSwipeable } from 'react-swipeable';
-import './Shopping.css';
-import { createPortal } from 'react-dom';
-
+import styles from './shopping/ShoppingLayout.module.css';
 import {
   createInitialShoppingLists,
   sortItems,
   type CheckItem,
   type ShoppingListData
 } from './shoppingData';
-
-type ShoppingListViewProps = ShoppingListData & {
-  showTitle?: boolean;
-  onToggle: (itemId: string) => void;
-  onAdd: () => void;
-  onOpenActions?: (item: CheckItem, position: { x: number; y: number }) => void;
-};
-
-type ShoppingPagerProps = {
-  lists: ShoppingListData[];
-  currentIndex: number;
-  onToggle: (listIndex: number, itemId: string) => void;
-  onAdd: (listIndex: number) => void;
-  onOpenActions?: (
-    listIndex: number,
-    item: CheckItem,
-    position: { x: number; y: number }
-  ) => void;
-};
-
-type PageDotsProps = {
-  count: number;
-  currentIndex: number;
-  onSelect: (index: number) => void;
-};
+import { Checklist } from './shopping/components/Checklist';
+import { PagerDots } from './shopping/components/PagerDots';
+import { Dialog } from './shopping/components/Dialog';
+import { AddItemForm, type AddItemFormState } from './shopping/components/AddItemForm';
+import { RenameItemForm } from './shopping/components/RenameItemForm';
+import { ContextMenu } from './shopping/components/ContextMenu';
 
 const createItemId = (listTitle: string) => {
   const normalized = listTitle
@@ -61,400 +28,72 @@ const createItemId = (listTitle: string) => {
   return `${normalized}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 };
 
-type CheckItemRowProps = {
-  item: CheckItem;
-  onToggle: () => void;
-  onOpenActions?: (position: { x: number; y: number }) => void;
+type ContextMenuState = {
+  listIndex: number;
+  itemId: string;
+  title: string;
+  anchor: { x: number; y: number };
 };
 
-const LONG_PRESS_DELAY = 600;
-const LONG_PRESS_MOVE_THRESHOLD = 10;
-
-const CheckItemRow = ({ item, onToggle, onOpenActions }: CheckItemRowProps) => {
-  const longPressTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
-  const startPointRef = useRef<{ x: number; y: number } | null>(null);
-  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
-  const suppressClickRef = useRef(false);
-  const activePointerIdRef = useRef<number | null>(null);
-  const activeTouchIdRef = useRef<number | null>(null);
-
-  const clearLongPress = useCallback(() => {
-    if (longPressTimeoutRef.current !== null) {
-      window.clearTimeout(longPressTimeoutRef.current);
-      longPressTimeoutRef.current = null;
-    }
-    startPointRef.current = null;
-    lastPointRef.current = null;
-    activePointerIdRef.current = null;
-    activeTouchIdRef.current = null;
-  }, []);
-
-  useEffect(() => () => clearLongPress(), [clearLongPress]);
-
-  const triggerContextMenu = useCallback(
-    (point?: { x: number; y: number }) => {
-      if (!onOpenActions) {
-        return;
-      }
-
-      const resolvedPoint = point ?? lastPointRef.current ?? startPointRef.current;
-      if (!resolvedPoint) {
-        return;
-      }
-
-      suppressClickRef.current = true;
-      onOpenActions(resolvedPoint);
-    },
-    [onOpenActions]
-  );
-
-  const startLongPressTimer = useCallback(() => {
-    if (longPressTimeoutRef.current !== null) {
-      window.clearTimeout(longPressTimeoutRef.current);
-    }
-
-    longPressTimeoutRef.current = window.setTimeout(() => {
-      triggerContextMenu();
-      clearLongPress();
-    }, LONG_PRESS_DELAY);
-  }, [clearLongPress, triggerContextMenu]);
-
-  const updateLastPoint = useCallback((point: { x: number; y: number }) => {
-    lastPointRef.current = point;
-  }, []);
-
-  const handlePointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLLIElement>) => {
-      if (!onOpenActions || !event.isPrimary) {
-        if (!event.isPrimary) {
-          clearLongPress();
-        }
-        return;
-      }
-
-      const isTouchLike = event.pointerType === 'touch' || event.pointerType === 'pen';
-      if (!isTouchLike) {
-        return;
-      }
-
-      suppressClickRef.current = false;
-      clearLongPress();
-      const point = { x: event.clientX, y: event.clientY };
-      startPointRef.current = point;
-      updateLastPoint(point);
-      activePointerIdRef.current = event.pointerId;
-      startLongPressTimer();
-    },
-    [clearLongPress, onOpenActions, startLongPressTimer, updateLastPoint]
-  );
-
-  const handlePointerMove = useCallback(
-    (event: ReactPointerEvent<HTMLLIElement>) => {
-      if (
-        longPressTimeoutRef.current === null ||
-        startPointRef.current === null ||
-        activePointerIdRef.current === null ||
-        event.pointerId !== activePointerIdRef.current
-      ) {
-        return;
-      }
-
-      const deltaX = event.clientX - startPointRef.current.x;
-      const deltaY = event.clientY - startPointRef.current.y;
-      if (Math.hypot(deltaX, deltaY) > LONG_PRESS_MOVE_THRESHOLD) {
-        clearLongPress();
-        return;
-      }
-
-      updateLastPoint({ x: event.clientX, y: event.clientY });
-    },
-    [clearLongPress, updateLastPoint]
-  );
-
-  const handlePointerEnd = useCallback(
-    (event: ReactPointerEvent<HTMLLIElement>) => {
-      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
-        return;
-      }
-      clearLongPress();
-    },
-    [clearLongPress]
-  );
-
-  const handleTouchStart = useCallback(
-    (event: ReactTouchEvent<HTMLLIElement>) => {
-      if (!onOpenActions) {
-        return;
-      }
-
-      if (typeof window !== 'undefined' && 'PointerEvent' in window) {
-        return;
-      }
-
-      if (event.touches.length !== 1) {
-        clearLongPress();
-        return;
-      }
-
-      const touch = event.touches[0];
-      suppressClickRef.current = false;
-      clearLongPress();
-      const point = { x: touch.clientX, y: touch.clientY };
-      startPointRef.current = point;
-      updateLastPoint(point);
-      activeTouchIdRef.current = touch.identifier;
-      startLongPressTimer();
-    },
-    [clearLongPress, onOpenActions, startLongPressTimer, updateLastPoint]
-  );
-
-  const handleTouchMove = useCallback(
-    (event: ReactTouchEvent<HTMLLIElement>) => {
-      if (typeof window !== 'undefined' && 'PointerEvent' in window) {
-        return;
-      }
-
-      if (
-        longPressTimeoutRef.current === null ||
-        startPointRef.current === null ||
-        activeTouchIdRef.current === null
-      ) {
-        return;
-      }
-
-      if (event.touches.length !== 1) {
-        clearLongPress();
-        return;
-      }
-
-      const trackedTouch = Array.from(event.touches).find(
-        (touch) => touch.identifier === activeTouchIdRef.current
-      );
-
-      if (!trackedTouch) {
-        clearLongPress();
-        return;
-      }
-
-      const deltaX = trackedTouch.clientX - startPointRef.current.x;
-      const deltaY = trackedTouch.clientY - startPointRef.current.y;
-      if (Math.hypot(deltaX, deltaY) > LONG_PRESS_MOVE_THRESHOLD) {
-        clearLongPress();
-        return;
-      }
-
-      updateLastPoint({ x: trackedTouch.clientX, y: trackedTouch.clientY });
-    },
-    [clearLongPress, updateLastPoint]
-  );
-
-  const handleTouchEnd = useCallback(
-    (event: ReactTouchEvent<HTMLLIElement>) => {
-      if (typeof window !== 'undefined' && 'PointerEvent' in window) {
-        return;
-      }
-
-      if (activeTouchIdRef.current === null) {
-        clearLongPress();
-        return;
-      }
-
-      const endedTouch = Array.from(event.changedTouches).some(
-        (touch) => touch.identifier === activeTouchIdRef.current
-      );
-
-      if (endedTouch || event.touches.length === 0) {
-        clearLongPress();
-      }
-    },
-    [clearLongPress]
-  );
-
-  const handleContextMenu = useCallback(
-    (event: ReactMouseEvent<HTMLLIElement>) => {
-      if (!onOpenActions) {
-        return;
-      }
-
-      event.preventDefault();
-      suppressClickRef.current = true;
-      triggerContextMenu({ x: event.clientX, y: event.clientY });
-    },
-    [onOpenActions, triggerContextMenu]
-  );
-
-  const handleClick = useCallback(
-    (event: ReactMouseEvent<HTMLLIElement>) => {
-      if (suppressClickRef.current) {
-        event.preventDefault();
-        suppressClickRef.current = false;
-        return;
-      }
-
-      onToggle();
-    },
-    [onToggle]
-  );
-
-  const handleKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLLIElement>) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        onToggle();
-      }
-    },
-    [onToggle]
-  );
-
-  return (
-    <li
-      className="check-item"
-      role="button"
-      tabIndex={0}
-      aria-pressed={item.done}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerCancel={handlePointerEnd}
-      onPointerLeave={handlePointerEnd}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
-      onContextMenu={handleContextMenu}
-    >
-      <span className="check-item__icon" aria-hidden="true">
-        {item.done ? '✅' : '❌'}
-      </span>
-      <span className="check-item__title">{item.title}</span>
-    </li>
-  );
+type RenameState = {
+  listIndex: number;
+  itemId: string;
+  value: string;
 };
 
-const ShoppingListView = ({
-  title,
-  items,
-  showTitle = true,
-  onToggle,
-  onAdd,
-  onOpenActions
-}: ShoppingListViewProps) => (
-  <div className="shopping-panel">
-    {showTitle ? <h2 className="shopping-list-title">{title}</h2> : null}
-    <ul className="shopping-items">
-      {items.map((item) => (
-        <CheckItemRow
-          key={item.id}
-          item={item}
-          onToggle={() => onToggle(item.id)}
-          onOpenActions={
-            onOpenActions
-              ? (position) => onOpenActions(item, position)
-              : undefined
-          }
-        />
-      ))}
-    </ul>
-    <div className="shopping-add-action">
-      <button type="button" className="shopping-add-button" onClick={onAdd}>
-        + добавить
-      </button>
-    </div>
-  </div>
-);
+const clampPosition = (position: { x: number; y: number }) => {
+  if (typeof window === 'undefined') {
+    return position;
+  }
 
-const PageDots = ({ count, currentIndex, onSelect }: PageDotsProps) => {
-  return (
-    <div className="shopping-dots" role="tablist" aria-label="Списки покупок">
-      {Array.from({ length: count }, (_, index) => {
-        const isActive = index === currentIndex;
-        return (
-          <button
-            key={index}
-            type="button"
-            className={`shopping-dot${isActive ? ' shopping-dot-active' : ''}`}
-            aria-label={`Перейти к списку ${index + 1}`}
-            aria-pressed={isActive}
-            onClick={() => onSelect(index)}
-          />
-        );
-      })}
-    </div>
-  );
-};
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const menuWidth = 220;
+  const menuHeight = 120;
+  const padding = 16;
 
-const ShoppingPager = ({ lists, currentIndex, onToggle, onAdd, onOpenActions }: ShoppingPagerProps) => {
-  const trackStyle = useMemo(
-    () => ({
-      transform: `translateX(-${currentIndex * 100}%)`
-    }),
-    [currentIndex]
-  );
-
-  return (
-    <div className="shopping-mobile">
-      <div className="shopping-track" style={trackStyle}>
-        {lists.map((list, index) => (
-          <ShoppingListView
-            key={list.title}
-            {...list}
-            showTitle={false}
-            onToggle={(itemId) => onToggle(index, itemId)}
-            onAdd={() => onAdd(index)}
-            onOpenActions={
-              onOpenActions
-                ? (item, position) => onOpenActions(index, item, position)
-                : undefined
-            }
-          />
-        ))}
-      </div>
-    </div>
-  );
+  return {
+    x: Math.min(Math.max(position.x, padding), viewportWidth - menuWidth - padding),
+    y: Math.min(Math.max(position.y, padding), viewportHeight - menuHeight - padding)
+  };
 };
 
 const Shopping = () => {
   const [lists, setLists] = useState<ShoppingListData[]>(() => createInitialShoppingLists());
-  const listCount = lists.length;
-
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return false;
     }
     return window.innerWidth >= 768;
   });
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalCategory, setModalCategory] = useState<string>('');
-  const [modalTitle, setModalTitle] = useState<string>('');
-  const [contextMenuState, setContextMenuState] = useState<
-    | null
-    | ({
-        listIndex: number;
-        itemId: string;
-        title: string;
-        x: number;
-        y: number;
-      })
-  >(null);
-  const [renameState, setRenameState] = useState<
-    | null
-    | ({
-        listIndex: number;
-        itemId: string;
-        value: string;
-      })
-  >(null);
 
-  const goToNextPage = useCallback(() => {
-    setCurrentIndex((index) => Math.min(Math.max(listCount - 1, 0), index + 1));
-  }, [listCount]);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addFormState, setAddFormState] = useState<AddItemFormState>({ category: '', title: '' });
+  const [contextMenuState, setContextMenuState] = useState<ContextMenuState | null>(null);
+  const [renameState, setRenameState] = useState<RenameState | null>(null);
 
-  const goToPrevPage = useCallback(() => {
-    setCurrentIndex((index) => Math.max(0, index - 1));
+  const listCount = lists.length;
+  const currentList = lists[currentIndex] ?? lists[0];
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (isDesktop) {
+      setCurrentIndex(0);
+    }
+  }, [isDesktop]);
 
   const handleToggleItem = useCallback((listIndex: number, itemId: string) => {
     setLists((prevLists) =>
@@ -478,56 +117,83 @@ const Shopping = () => {
     );
   }, []);
 
-  const handleOpenModal = useCallback(
+  const openAddDialog = useCallback(
     (categoryTitle: string) => {
-      const nextCategory = categoryTitle || lists[0]?.title || '';
-      if (!nextCategory) {
+      const fallbackCategory = lists[0]?.title ?? '';
+      const category = categoryTitle || fallbackCategory;
+      if (!category) {
         return;
       }
-
-      setModalCategory(nextCategory);
-      setModalTitle('');
-      setIsModalOpen(true);
+      setAddFormState({ category, title: '' });
+      setAddDialogOpen(true);
     },
     [lists]
   );
 
-  const handleCloseModal = useCallback(() => {
-    setIsModalOpen(false);
-    setModalTitle('');
+  const closeAddDialog = useCallback(() => {
+    setAddDialogOpen(false);
+    setAddFormState((prev) => ({ ...prev, title: '' }));
+  }, []);
+
+  const openContextMenu = useCallback((listIndex: number, item: CheckItem, position: { x: number; y: number }) => {
+    setContextMenuState({
+      listIndex,
+      itemId: item.id,
+      title: item.title,
+      anchor: clampPosition(position)
+    });
   }, []);
 
   const closeContextMenu = useCallback(() => {
     setContextMenuState(null);
   }, []);
 
-  const handleOpenContextMenu = useCallback(
-    (listIndex: number, item: CheckItem, position: { x: number; y: number }) => {
-      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
-      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 0;
-      const menuWidth = 220;
-      const menuHeight = 120;
-      const padding = 16;
+  const startRename = useCallback((state: RenameState) => {
+    setRenameState(state);
+  }, []);
 
-      const clampedX = viewportWidth
-        ? Math.min(Math.max(position.x, padding), viewportWidth - menuWidth - padding)
-        : position.x;
-      const clampedY = viewportHeight
-        ? Math.min(Math.max(position.y, padding), viewportHeight - menuHeight - padding)
-        : position.y;
+  const cancelRename = useCallback(() => {
+    setRenameState(null);
+  }, []);
 
-      setContextMenuState({
-        listIndex,
-        itemId: item.id,
-        title: item.title,
-        x: clampedX,
-        y: clampedY
-      });
-    },
-    []
-  );
+  const applyRename = useCallback(() => {
+    setRenameState((current) => {
+      if (!current) {
+        return current;
+      }
 
-  const handleDeleteItem = useCallback((listIndex: number, itemId: string) => {
+      const trimmedValue = current.value.trim();
+      if (!trimmedValue) {
+        return null;
+      }
+
+      setLists((prevLists) =>
+        prevLists.map((list, index) => {
+          if (index !== current.listIndex) {
+            return list;
+          }
+
+          return {
+            ...list,
+            items: sortItems(
+              list.items.map((item) =>
+                item.id === current.itemId
+                  ? {
+                      ...item,
+                      title: trimmedValue
+                    }
+                  : item
+              )
+            )
+          };
+        })
+      );
+
+      return null;
+    });
+  }, []);
+
+  const deleteItem = useCallback((listIndex: number, itemId: string) => {
     setLists((prevLists) =>
       prevLists.map((list, index) => {
         if (index !== listIndex) {
@@ -542,106 +208,42 @@ const Shopping = () => {
     );
   }, []);
 
-  const handleStartRename = useCallback((listIndex: number, itemId: string, currentTitle: string) => {
-    setRenameState({ listIndex, itemId, value: currentTitle });
-  }, []);
-
-  const handleRenameInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const nextValue = event.target.value;
-    setRenameState((prev) => (prev ? { ...prev, value: nextValue } : prev));
-  }, []);
-
-  const handleRenameSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (!renameState) {
-        return;
-      }
-
-      const trimmedValue = renameState.value.trim();
-      if (!trimmedValue) {
-        setRenameState(null);
-        return;
-      }
-
-      setLists((prevLists) =>
-        prevLists.map((list, index) => {
-          if (index !== renameState.listIndex) {
-            return list;
-          }
-
-          return {
-            ...list,
-            items: sortItems(
-              list.items.map((item) =>
-                item.id === renameState.itemId
-                  ? {
-                      ...item,
-                      title: trimmedValue
-                    }
-                  : item
-              )
-            )
-          };
-        })
-      );
-
-      setRenameState(null);
-    },
-    [renameState]
-  );
-
-  const handleRenameCancel = useCallback(() => {
-    setRenameState(null);
-  }, []);
-
-  useEffect(() => {
-    if (!isModalOpen || typeof window === 'undefined') {
+  const addItem = useCallback(() => {
+    const trimmed = addFormState.title.trim();
+    if (!addFormState.category || !trimmed) {
       return;
     }
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        handleCloseModal();
-      }
+    const newItem: CheckItem = {
+      id: createItemId(addFormState.category),
+      title: trimmed,
+      done: false
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleCloseModal, isModalOpen]);
+    let addedIndex = -1;
 
-  useEffect(() => {
-    if (!contextMenuState || typeof window === 'undefined') {
-      return;
+    setLists((prevLists) =>
+      prevLists.map((list, index) => {
+        if (list.title !== addFormState.category) {
+          return list;
+        }
+
+        addedIndex = index;
+        return {
+          ...list,
+          items: sortItems([...list.items, newItem])
+        };
+      })
+    );
+
+    if (!isDesktop && addedIndex !== -1 && addedIndex !== currentIndex) {
+      setCurrentIndex(addedIndex);
     }
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        closeContextMenu();
-      }
-    };
+    closeAddDialog();
+  }, [addFormState, closeAddDialog, currentIndex, isDesktop]);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [closeContextMenu, contextMenuState]);
-
-  useEffect(() => {
-    if (!renameState || typeof window === 'undefined') {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        handleRenameCancel();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleRenameCancel, renameState]);
+  const categoryOptions = useMemo(() => lists.map((list) => list.title), [lists]);
 
   const isSwipeDebugEnabled = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -668,8 +270,8 @@ const Shopping = () => {
       const target = eventData.event?.target as HTMLElement | null;
       console.log('[shopping] swiping', target?.tagName ?? 'unknown', eventData.dir);
     },
-    onSwipedLeft: () => goToNextPage(),
-    onSwipedRight: () => goToPrevPage(),
+    onSwipedLeft: () => setCurrentIndex((index) => Math.min(Math.max(listCount - 1, 0), index + 1)),
+    onSwipedRight: () => setCurrentIndex((index) => Math.max(0, index - 1)),
     onSwiped: (eventData) => {
       if (!isSwipeDebugEnabled) {
         return;
@@ -685,274 +287,112 @@ const Shopping = () => {
     rotationAngle: 0
   });
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
+  const trackStyle = useMemo(
+    () => ({
+      transform: `translateX(-${currentIndex * 100}%)`
+    }),
+    [currentIndex]
+  );
 
-    const handleResize = () => {
-      setIsDesktop(window.innerWidth >= 768);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    if (isDesktop) {
-      setCurrentIndex(0);
-    }
-  }, [isDesktop]);
-
-  const currentList = lists[currentIndex] ?? lists[0];
+  const activeContext = contextMenuState;
 
   if (!currentList) {
     return null;
   }
 
-  const categoryOptions = useMemo(() => lists.map((list) => list.title), [lists]);
-  const trimmedModalTitle = modalTitle.trim();
-  const isAddDisabled = trimmedModalTitle.length === 0;
-
-  const handleModalSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const titleToAdd = modalTitle.trim();
-      if (!modalCategory || !titleToAdd) {
-        return;
-      }
-
-      const itemId = createItemId(modalCategory);
-      const newItem: CheckItem = { id: itemId, title: titleToAdd, done: false };
-      let addedIndex = -1;
-
-      setLists((prevLists) =>
-        prevLists.map((list, index) => {
-          if (list.title !== modalCategory) {
-            return list;
-          }
-
-          addedIndex = index;
-          return {
-            ...list,
-            items: sortItems([...list.items, newItem])
-          };
-        })
-      );
-
-      if (!isDesktop && addedIndex !== -1 && addedIndex !== currentIndex) {
-        setCurrentIndex(addedIndex);
-      }
-
-      handleCloseModal();
-    },
-    [currentIndex, handleCloseModal, isDesktop, modalCategory, modalTitle]
-  );
-
-  const handleModalTitleChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    setModalTitle(event.target.value);
-  }, []);
-
-  const handleModalCategoryChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
-    setModalCategory(event.target.value);
-  }, []);
-
   return (
-    <section className="shopping-page">
-      <header className="shopping-header">
-        {!isDesktop && (
-          <h1 className="shopping-current-title">{currentList.title}</h1>
-        )}
+    <section className={styles.page}>
+      <header className={styles.header}>
+        {!isDesktop ? <h1 className={styles.currentTitle}>{currentList.title}</h1> : null}
       </header>
       {isDesktop ? (
-        <div className="shopping-desktop-grid" aria-label="Списки покупок">
+        <div className={styles.desktopGrid} aria-label="Списки покупок">
           {lists.map((list, index) => (
-            <ShoppingListView
+            <Checklist
               key={list.title}
-              {...list}
+              title={list.title}
+              items={list.items}
               onToggle={(itemId) => handleToggleItem(index, itemId)}
-              onAdd={() => handleOpenModal(list.title)}
-              onOpenActions={(item, position) =>
-                handleOpenContextMenu(index, item, position)
-              }
+              onAdd={() => openAddDialog(list.title)}
+              onOpenActions={(item, position) => openContextMenu(index, item, position)}
             />
           ))}
         </div>
       ) : (
-        <div className="shopping-content" {...swipeHandlers}>
-          <ShoppingPager
-            lists={lists}
-            currentIndex={currentIndex}
-            onToggle={handleToggleItem}
-            onAdd={(index) => handleOpenModal(lists[index]?.title ?? '')}
-            onOpenActions={(listIndex, item, position) =>
-              handleOpenContextMenu(listIndex, item, position)
-            }
-          />
-          <PageDots count={listCount} currentIndex={currentIndex} onSelect={setCurrentIndex} />
+        <div className={`${styles.mobileContent} shopping-content`} {...swipeHandlers}>
+          <div className={styles.mobileTrackWrapper}>
+            <div className={`${styles.mobileTrack} shopping-track`} style={trackStyle}>
+              {lists.map((list, index) => (
+                <div key={list.title} className={styles.mobilePanel}>
+                  <Checklist
+                    title={list.title}
+                    items={list.items}
+                    showTitle={false}
+                    onToggle={(itemId) => handleToggleItem(index, itemId)}
+                    onAdd={() => openAddDialog(list.title)}
+                    onOpenActions={(item, position) => openContextMenu(index, item, position)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+          <PagerDots count={listCount} currentIndex={currentIndex} onSelect={setCurrentIndex} />
         </div>
       )}
-      {isModalOpen ? (
-        <div className="shopping-modal-overlay" role="presentation" onClick={handleCloseModal}>
-          <div
-            className="shopping-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="shopping-modal-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="shopping-modal-title" className="shopping-modal-title">
-              Добавить позицию
-            </h2>
-            <form className="shopping-modal-form" onSubmit={handleModalSubmit}>
-              <label className="shopping-modal-field">
-                <span className="shopping-modal-label">Категория</span>
-                <select
-                  className="shopping-modal-select"
-                  value={modalCategory}
-                  onChange={handleModalCategoryChange}
-                  required
-                >
-                  {categoryOptions.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="shopping-modal-field">
-                <span className="shopping-modal-label">Название</span>
-                <input
-                  className="shopping-modal-input"
-                  type="text"
-                  value={modalTitle}
-                  onChange={handleModalTitleChange}
-                  placeholder="Что добавить?"
-                  autoFocus
-                  required
-                />
-              </label>
-              <div className="shopping-modal-actions">
-                <button
-                  type="submit"
-                  className="shopping-modal-button shopping-modal-button-primary"
-                  disabled={isAddDisabled}
-                >
-                  Добавить
-                </button>
-                <button
-                  type="button"
-                  className="shopping-modal-button shopping-modal-button-secondary"
-                  onClick={handleCloseModal}
-                >
-                  Отменить
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-      {contextMenuState
-        ? createPortal(
-            <div
-              className="shopping-context-overlay"
-              role="presentation"
-              onClick={closeContextMenu}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                closeContextMenu();
-              }}
-              onWheel={(event) => event.preventDefault()}
-              onTouchMove={(event) => event.preventDefault()}
-            >
-              <div
-                className="shopping-context-menu"
-                style={{ top: contextMenuState.y, left: contextMenuState.x }}
-                role="menu"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  className="shopping-context-button"
-                  role="menuitem"
-                  onClick={() => {
-                    closeContextMenu();
-                    handleStartRename(
-                      contextMenuState.listIndex,
-                      contextMenuState.itemId,
-                      contextMenuState.title
-                    );
-                  }}
-                >
-                  Переименовать
-                </button>
-                <button
-                  type="button"
-                  className="shopping-context-button shopping-context-button-danger"
-                  role="menuitem"
-                  onClick={() => {
-                    handleDeleteItem(contextMenuState.listIndex, contextMenuState.itemId);
-                    closeContextMenu();
-                  }}
-                >
-                  Удалить
-                </button>
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
-      {renameState
-        ? createPortal(
-            <div
-              className="shopping-rename-overlay"
-              role="presentation"
-              onClick={handleRenameCancel}
-              onContextMenu={(event) => event.preventDefault()}
-            >
-              <div
-                className="shopping-rename-modal"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="shopping-rename-title"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <h2 id="shopping-rename-title" className="shopping-rename-title">
-                  Переименовать
-                </h2>
-                <form className="shopping-rename-form" onSubmit={handleRenameSubmit}>
-                  <label className="shopping-rename-field">
-                    <span className="shopping-rename-label">Название</span>
-                    <input
-                      className="shopping-modal-input"
-                      type="text"
-                      value={renameState.value}
-                      onChange={handleRenameInputChange}
-                      autoFocus
-                      required
-                    />
-                  </label>
-                  <div className="shopping-rename-actions">
-                    <button
-                      type="submit"
-                      className="shopping-modal-button shopping-modal-button-primary"
-                    >
-                      Сохранить
-                    </button>
-                    <button
-                      type="button"
-                      className="shopping-modal-button shopping-modal-button-secondary"
-                      onClick={handleRenameCancel}
-                    >
-                      Отмена
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
+
+      <Dialog
+        open={addDialogOpen}
+        onClose={closeAddDialog}
+        title="Добавить позицию"
+        labelledBy="shopping-add-dialog-title"
+      >
+        <AddItemForm
+          state={addFormState}
+          categoryOptions={categoryOptions}
+          onCategoryChange={(value) => setAddFormState((prev) => ({ ...prev, category: value }))}
+          onTitleChange={(value) => setAddFormState((prev) => ({ ...prev, title: value }))}
+          onSubmit={addItem}
+          onCancel={closeAddDialog}
+        />
+      </Dialog>
+
+      <Dialog
+        open={Boolean(renameState)}
+        onClose={cancelRename}
+        title="Переименовать"
+        labelledBy="shopping-rename-dialog-title"
+      >
+        {renameState ? (
+          <RenameItemForm
+            value={renameState.value}
+            onChange={(value) => setRenameState((prev) => (prev ? { ...prev, value } : prev))}
+            onSubmit={applyRename}
+            onCancel={cancelRename}
+          />
+        ) : null}
+      </Dialog>
+
+      <ContextMenu
+        open={Boolean(activeContext)}
+        anchor={activeContext?.anchor ?? null}
+        onClose={closeContextMenu}
+        onRename={() => {
+          if (!activeContext) {
+            return;
+          }
+          startRename({
+            listIndex: activeContext.listIndex,
+            itemId: activeContext.itemId,
+            value: activeContext.title
+          });
+        }}
+        onDelete={() => {
+          if (!activeContext) {
+            return;
+          }
+          deleteItem(activeContext.listIndex, activeContext.itemId);
+        }}
+      />
     </section>
   );
 };

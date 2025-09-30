@@ -1,0 +1,8 @@
+.danger {
+  color: var(--app-color-danger);
+}
+
+.danger:hover,
+.danger:focus-visible {
+  color: var(--app-color-danger);
+}

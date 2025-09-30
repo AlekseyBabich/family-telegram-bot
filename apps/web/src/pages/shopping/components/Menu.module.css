@@ -1,0 +1,47 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 60;
+}
+
+.menu {
+  position: absolute;
+  min-width: 220px;
+  background: var(--app-color-surface);
+  border-radius: calc(var(--app-radius) + 2px);
+  box-shadow: var(--app-shadow-low);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.menuButton {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--app-radius);
+  padding: 10px 14px;
+  font: var(--app-typography-body);
+  color: var(--app-color-text-primary);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.menuButton:hover,
+.menuButton:focus-visible {
+  background: var(--app-color-surface-subtle);
+  outline: none;
+}
+
+.danger {
+  color: var(--app-color-danger);
+}
+
+.danger:hover,
+.danger:focus-visible {
+  background: rgba(220, 38, 38, 0.12);
+}
