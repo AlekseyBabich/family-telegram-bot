@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
+import { createInitialShoppingLists } from '../pages/shoppingData';
 
 const setViewportWidth = (width: number) => {
   Object.defineProperty(window, 'innerWidth', {
@@ -64,15 +65,24 @@ describe('Shopping page responsive behaviour', () => {
       </MemoryRouter>
     );
 
-    const allItems = screen.getAllByRole('button', { name: /Пункт/ });
-    expect(allItems).toHaveLength(30);
-    allItems.forEach((item) => {
-      expect(item).toHaveTextContent('❌');
-      expect(item).toHaveAttribute('aria-pressed', 'false');
+    const initialLists = createInitialShoppingLists();
+    const renderedLists = screen.getAllByRole('list');
+    expect(renderedLists).toHaveLength(initialLists.length);
+
+    initialLists.forEach((initialList, index) => {
+      const renderedItems = within(renderedLists[index]).getAllByRole('button');
+      expect(renderedItems).toHaveLength(initialList.items.length);
+      renderedItems.forEach((button) => {
+        expect(button).toHaveTextContent('❌');
+        expect(button).toHaveAttribute('aria-pressed', 'false');
+      });
     });
 
-    const firstList = screen.getAllByRole('list')[0];
-    const firstItem = within(firstList).getByRole('button', { name: 'Пункт 1' });
+    const firstInitialList = initialLists[0];
+    const firstRenderedList = renderedLists[0];
+    const firstItemTitle = firstInitialList.items[0]?.title ?? '';
+    const firstItem = within(firstRenderedList).getAllByRole('button')[0];
+    expect(firstItem).toHaveTextContent(firstItemTitle);
 
     fireEvent.click(firstItem);
     expect(firstItem).toHaveTextContent('✅');
@@ -90,8 +100,11 @@ describe('Shopping page responsive behaviour', () => {
       </MemoryRouter>
     );
 
+    const firstInitialList = createInitialShoppingLists()[0];
     const firstList = screen.getAllByRole('list')[0];
-    const firstItem = within(firstList).getByRole('button', { name: 'Пункт 1' });
+    const firstItemTitle = firstInitialList.items[0]?.title ?? '';
+    const firstItem = within(firstList).getAllByRole('button')[0];
+    expect(firstItem).toHaveTextContent(firstItemTitle);
 
     fireEvent.click(firstItem);
 
