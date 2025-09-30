@@ -2,13 +2,17 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type FormEvent,
-  type ChangeEvent
+  type ChangeEvent,
+  type PointerEvent as ReactPointerEvent,
+  type MouseEvent as ReactMouseEvent
 } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import './Shopping.css';
+import { createPortal } from 'react-dom';
 
 import {
   createInitialShoppingLists,
@@ -21,6 +25,7 @@ type ShoppingListViewProps = ShoppingListData & {
   showTitle?: boolean;
   onToggle: (itemId: string) => void;
   onAdd: () => void;
+  onOpenActions?: (item: CheckItem, position: { x: number; y: number }) => void;
 };
 
 type ShoppingPagerProps = {
@@ -28,6 +33,11 @@ type ShoppingPagerProps = {
   currentIndex: number;
   onToggle: (listIndex: number, itemId: string) => void;
   onAdd: (listIndex: number) => void;
+  onOpenActions?: (
+    listIndex: number,
+    item: CheckItem,
+    position: { x: number; y: number }
+  ) => void;
 };
 
 type PageDotsProps = {
@@ -50,35 +60,166 @@ const createItemId = (listTitle: string) => {
   return `${normalized}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 };
 
-const ShoppingListView = ({ title, items, showTitle = true, onToggle, onAdd }: ShoppingListViewProps) => (
+type CheckItemRowProps = {
+  item: CheckItem;
+  onToggle: () => void;
+  onOpenActions?: (position: { x: number; y: number }) => void;
+};
+
+const LONG_PRESS_DELAY = 450;
+const LONG_PRESS_MOVE_THRESHOLD = 12;
+
+const CheckItemRow = ({ item, onToggle, onOpenActions }: CheckItemRowProps) => {
+  const longPressTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const startPointRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressClickRef = useRef(false);
+
+  const clearLongPress = useCallback(() => {
+    if (longPressTimeoutRef.current !== null) {
+      window.clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = null;
+    }
+    startPointRef.current = null;
+  }, []);
+
+  useEffect(() => () => clearLongPress(), [clearLongPress]);
+
+  const triggerContextMenu = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!onOpenActions) {
+        return;
+      }
+
+      suppressClickRef.current = true;
+      onOpenActions({ x: clientX, y: clientY });
+    },
+    [onOpenActions]
+  );
+
+  const handlePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLLIElement>) => {
+      if (!onOpenActions || !event.isPrimary) {
+        return;
+      }
+
+      const isTouchLike = event.pointerType === 'touch' || event.pointerType === 'pen';
+      if (!isTouchLike) {
+        return;
+      }
+
+      suppressClickRef.current = false;
+      clearLongPress();
+      startPointRef.current = { x: event.clientX, y: event.clientY };
+
+      longPressTimeoutRef.current = window.setTimeout(() => {
+        triggerContextMenu(event.clientX, event.clientY);
+        clearLongPress();
+      }, LONG_PRESS_DELAY);
+    },
+    [clearLongPress, onOpenActions, triggerContextMenu]
+  );
+
+  const handlePointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLLIElement>) => {
+      if (longPressTimeoutRef.current === null || startPointRef.current === null) {
+        return;
+      }
+
+      const deltaX = event.clientX - startPointRef.current.x;
+      const deltaY = event.clientY - startPointRef.current.y;
+      if (Math.hypot(deltaX, deltaY) > LONG_PRESS_MOVE_THRESHOLD) {
+        clearLongPress();
+      }
+    },
+    [clearLongPress]
+  );
+
+  const handlePointerEnd = useCallback(() => {
+    clearLongPress();
+  }, [clearLongPress]);
+
+  const handleContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLLIElement>) => {
+      if (!onOpenActions) {
+        return;
+      }
+
+      event.preventDefault();
+      suppressClickRef.current = true;
+      triggerContextMenu(event.clientX, event.clientY);
+    },
+    [onOpenActions, triggerContextMenu]
+  );
+
+  const handleClick = useCallback(
+    (event: ReactMouseEvent<HTMLLIElement>) => {
+      if (suppressClickRef.current) {
+        event.preventDefault();
+        suppressClickRef.current = false;
+        return;
+      }
+
+      onToggle();
+    },
+    [onToggle]
+  );
+
+  const handleKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLLIElement>) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onToggle();
+      }
+    },
+    [onToggle]
+  );
+
+  return (
+    <li
+      className="check-item"
+      role="button"
+      tabIndex={0}
+      aria-pressed={item.done}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onPointerLeave={handlePointerEnd}
+      onContextMenu={handleContextMenu}
+    >
+      <span className="check-item__icon" aria-hidden="true">
+        {item.done ? '✅' : '❌'}
+      </span>
+      <span className="check-item__title">{item.title}</span>
+    </li>
+  );
+};
+
+const ShoppingListView = ({
+  title,
+  items,
+  showTitle = true,
+  onToggle,
+  onAdd,
+  onOpenActions
+}: ShoppingListViewProps) => (
   <div className="shopping-panel">
     {showTitle ? <h2 className="shopping-list-title">{title}</h2> : null}
     <ul className="shopping-items">
-      {items.map((item) => {
-        const handleKeyDown = (event: ReactKeyboardEvent<HTMLLIElement>) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            onToggle(item.id);
+      {items.map((item) => (
+        <CheckItemRow
+          key={item.id}
+          item={item}
+          onToggle={() => onToggle(item.id)}
+          onOpenActions={
+            onOpenActions
+              ? (position) => onOpenActions(item, position)
+              : undefined
           }
-        };
-
-        return (
-          <li
-            key={item.id}
-            className="check-item"
-            role="button"
-            tabIndex={0}
-            aria-pressed={item.done}
-            onClick={() => onToggle(item.id)}
-            onKeyDown={handleKeyDown}
-          >
-            <span className="check-item__icon" aria-hidden="true">
-              {item.done ? '✅' : '❌'}
-            </span>
-            <span className="check-item__title">{item.title}</span>
-          </li>
-        );
-      })}
+        />
+      ))}
     </ul>
     <div className="shopping-add-action">
       <button type="button" className="shopping-add-button" onClick={onAdd}>
@@ -108,7 +249,7 @@ const PageDots = ({ count, currentIndex, onSelect }: PageDotsProps) => {
   );
 };
 
-const ShoppingPager = ({ lists, currentIndex, onToggle, onAdd }: ShoppingPagerProps) => {
+const ShoppingPager = ({ lists, currentIndex, onToggle, onAdd, onOpenActions }: ShoppingPagerProps) => {
   const trackStyle = useMemo(
     () => ({
       transform: `translateX(-${currentIndex * 100}%)`
@@ -126,6 +267,11 @@ const ShoppingPager = ({ lists, currentIndex, onToggle, onAdd }: ShoppingPagerPr
             showTitle={false}
             onToggle={(itemId) => onToggle(index, itemId)}
             onAdd={() => onAdd(index)}
+            onOpenActions={
+              onOpenActions
+                ? (item, position) => onOpenActions(index, item, position)
+                : undefined
+            }
           />
         ))}
       </div>
@@ -147,6 +293,24 @@ const Shopping = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalCategory, setModalCategory] = useState<string>('');
   const [modalTitle, setModalTitle] = useState<string>('');
+  const [contextMenuState, setContextMenuState] = useState<
+    | null
+    | ({
+        listIndex: number;
+        itemId: string;
+        title: string;
+        x: number;
+        y: number;
+      })
+  >(null);
+  const [renameState, setRenameState] = useState<
+    | null
+    | ({
+        listIndex: number;
+        itemId: string;
+        value: string;
+      })
+  >(null);
 
   const goToNextPage = useCallback(() => {
     setCurrentIndex((index) => Math.min(Math.max(listCount - 1, 0), index + 1));
@@ -197,6 +361,104 @@ const Shopping = () => {
     setModalTitle('');
   }, []);
 
+  const closeContextMenu = useCallback(() => {
+    setContextMenuState(null);
+  }, []);
+
+  const handleOpenContextMenu = useCallback(
+    (listIndex: number, item: CheckItem, position: { x: number; y: number }) => {
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 0;
+      const menuWidth = 220;
+      const menuHeight = 120;
+      const padding = 16;
+
+      const clampedX = viewportWidth
+        ? Math.min(Math.max(position.x, padding), viewportWidth - menuWidth - padding)
+        : position.x;
+      const clampedY = viewportHeight
+        ? Math.min(Math.max(position.y, padding), viewportHeight - menuHeight - padding)
+        : position.y;
+
+      setContextMenuState({
+        listIndex,
+        itemId: item.id,
+        title: item.title,
+        x: clampedX,
+        y: clampedY
+      });
+    },
+    []
+  );
+
+  const handleDeleteItem = useCallback((listIndex: number, itemId: string) => {
+    setLists((prevLists) =>
+      prevLists.map((list, index) => {
+        if (index !== listIndex) {
+          return list;
+        }
+
+        return {
+          ...list,
+          items: sortItems(list.items.filter((item) => item.id !== itemId))
+        };
+      })
+    );
+  }, []);
+
+  const handleStartRename = useCallback((listIndex: number, itemId: string, currentTitle: string) => {
+    setRenameState({ listIndex, itemId, value: currentTitle });
+  }, []);
+
+  const handleRenameInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const nextValue = event.target.value;
+    setRenameState((prev) => (prev ? { ...prev, value: nextValue } : prev));
+  }, []);
+
+  const handleRenameSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!renameState) {
+        return;
+      }
+
+      const trimmedValue = renameState.value.trim();
+      if (!trimmedValue) {
+        setRenameState(null);
+        return;
+      }
+
+      setLists((prevLists) =>
+        prevLists.map((list, index) => {
+          if (index !== renameState.listIndex) {
+            return list;
+          }
+
+          return {
+            ...list,
+            items: sortItems(
+              list.items.map((item) =>
+                item.id === renameState.itemId
+                  ? {
+                      ...item,
+                      title: trimmedValue
+                    }
+                  : item
+              )
+            )
+          };
+        })
+      );
+
+      setRenameState(null);
+    },
+    [renameState]
+  );
+
+  const handleRenameCancel = useCallback(() => {
+    setRenameState(null);
+  }, []);
+
   useEffect(() => {
     if (!isModalOpen || typeof window === 'undefined') {
       return;
@@ -212,6 +474,38 @@ const Shopping = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleCloseModal, isModalOpen]);
+
+  useEffect(() => {
+    if (!contextMenuState || typeof window === 'undefined') {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeContextMenu();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [closeContextMenu, contextMenuState]);
+
+  useEffect(() => {
+    if (!renameState || typeof window === 'undefined') {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        handleRenameCancel();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleRenameCancel, renameState]);
 
   const isSwipeDebugEnabled = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -342,6 +636,9 @@ const Shopping = () => {
               {...list}
               onToggle={(itemId) => handleToggleItem(index, itemId)}
               onAdd={() => handleOpenModal(list.title)}
+              onOpenActions={(item, position) =>
+                handleOpenContextMenu(index, item, position)
+              }
             />
           ))}
         </div>
@@ -352,6 +649,9 @@ const Shopping = () => {
             currentIndex={currentIndex}
             onToggle={handleToggleItem}
             onAdd={(index) => handleOpenModal(lists[index]?.title ?? '')}
+            onOpenActions={(listIndex, item, position) =>
+              handleOpenContextMenu(listIndex, item, position)
+            }
           />
           <PageDots count={listCount} currentIndex={currentIndex} onSelect={setCurrentIndex} />
         </div>
@@ -416,6 +716,107 @@ const Shopping = () => {
           </div>
         </div>
       ) : null}
+      {contextMenuState
+        ? createPortal(
+            <div
+              className="shopping-context-overlay"
+              role="presentation"
+              onClick={closeContextMenu}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                closeContextMenu();
+              }}
+              onWheel={(event) => event.preventDefault()}
+              onTouchMove={(event) => event.preventDefault()}
+            >
+              <div
+                className="shopping-context-menu"
+                style={{ top: contextMenuState.y, left: contextMenuState.x }}
+                role="menu"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="shopping-context-button"
+                  role="menuitem"
+                  onClick={() => {
+                    closeContextMenu();
+                    handleStartRename(
+                      contextMenuState.listIndex,
+                      contextMenuState.itemId,
+                      contextMenuState.title
+                    );
+                  }}
+                >
+                  Переименовать
+                </button>
+                <button
+                  type="button"
+                  className="shopping-context-button shopping-context-button-danger"
+                  role="menuitem"
+                  onClick={() => {
+                    handleDeleteItem(contextMenuState.listIndex, contextMenuState.itemId);
+                    closeContextMenu();
+                  }}
+                >
+                  Удалить
+                </button>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
+      {renameState
+        ? createPortal(
+            <div
+              className="shopping-rename-overlay"
+              role="presentation"
+              onClick={handleRenameCancel}
+              onContextMenu={(event) => event.preventDefault()}
+            >
+              <div
+                className="shopping-rename-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="shopping-rename-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <h2 id="shopping-rename-title" className="shopping-rename-title">
+                  Переименовать
+                </h2>
+                <form className="shopping-rename-form" onSubmit={handleRenameSubmit}>
+                  <label className="shopping-rename-field">
+                    <span className="shopping-rename-label">Название</span>
+                    <input
+                      className="shopping-modal-input"
+                      type="text"
+                      value={renameState.value}
+                      onChange={handleRenameInputChange}
+                      autoFocus
+                      required
+                    />
+                  </label>
+                  <div className="shopping-rename-actions">
+                    <button
+                      type="submit"
+                      className="shopping-modal-button shopping-modal-button-primary"
+                    >
+                      Сохранить
+                    </button>
+                    <button
+                      type="button"
+                      className="shopping-modal-button shopping-modal-button-secondary"
+                      onClick={handleRenameCancel}
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </section>
   );
 };
