@@ -5,6 +5,8 @@
   padding: 16px;
   min-height: calc(100vh - 64px);
   background: var(--app-color-background);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .header {
