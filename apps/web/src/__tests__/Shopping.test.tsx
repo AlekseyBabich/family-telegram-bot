@@ -148,4 +148,56 @@ describe('Shopping page responsive behaviour', () => {
     logSpy.mockRestore();
     errorSpy.mockRestore();
   });
+
+  it('keeps the active tab after adding an item on mobile', () => {
+    setViewportWidth(500);
+
+    render(
+      <MemoryRouter initialEntries={["/shopping"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    const secondDot = screen.getByRole('button', { name: 'Перейти к списку 2' });
+    fireEvent.click(secondDot);
+    expect(secondDot).toHaveAttribute('aria-pressed', 'true');
+
+    const lists = screen.getAllByRole('list');
+    const householdPanel = lists[1]?.parentElement as HTMLElement;
+    const addButton = within(householdPanel).getByRole('button', { name: '+ добавить' });
+    fireEvent.click(addButton);
+
+    const titleInput = screen.getByLabelText('Название');
+    fireEvent.change(titleInput, { target: { value: 'Абажур настольный' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить' }));
+
+    expect(secondDot).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('keeps the active tab after renaming an item on mobile', () => {
+    setViewportWidth(500);
+
+    render(
+      <MemoryRouter initialEntries={["/shopping"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    const thirdDot = screen.getByRole('button', { name: 'Перейти к списку 3' });
+    fireEvent.click(thirdDot);
+    expect(thirdDot).toHaveAttribute('aria-pressed', 'true');
+
+    const lists = screen.getAllByRole('list');
+    const thirdList = lists[2];
+    const firstItem = within(thirdList).getAllByRole('button')[0];
+
+    fireEvent.contextMenu(firstItem, { clientX: 100, clientY: 100 });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Переименовать' }));
+
+    const renameInput = screen.getByLabelText('Название');
+    fireEvent.change(renameInput, { target: { value: 'Новый плед' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    expect(thirdDot).toHaveAttribute('aria-pressed', 'true');
+  });
 });

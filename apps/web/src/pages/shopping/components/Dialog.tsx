@@ -24,6 +24,28 @@ export const Dialog = ({
       return;
     }
 
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyPaddingRight = body.style.paddingRight;
+    const previousBodyPosition = body.style.position;
+    const previousBodyTop = body.style.top;
+    const previousBodyWidth = body.style.width;
+    const previousHtmlOverflow = documentElement.style.overflow;
+    const computedBodyPaddingRight = Number.parseFloat(
+      window.getComputedStyle(body).paddingRight || '0'
+    );
+    const scrollbarWidth = window.innerWidth - documentElement.clientWidth;
+    const scrollY = window.scrollY;
+
+    body.style.overflow = 'hidden';
+    documentElement.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${computedBodyPaddingRight + scrollbarWidth}px`;
+    }
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.width = '100%';
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -32,7 +54,26 @@ export const Dialog = ({
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      body.style.overflow = previousBodyOverflow;
+      body.style.paddingRight = previousBodyPaddingRight;
+      body.style.position = previousBodyPosition;
+      body.style.top = previousBodyTop;
+      body.style.width = previousBodyWidth;
+      documentElement.style.overflow = previousHtmlOverflow;
+      if (
+        typeof window !== 'undefined' &&
+        typeof window.scrollTo === 'function' &&
+        scrollY !== 0
+      ) {
+        try {
+          window.scrollTo(0, scrollY);
+        } catch (error) {
+          // Ignore unsupported scroll operations (e.g. in test environments).
+        }
+      }
+    };
   }, [onClose, open]);
 
   if (!open) {

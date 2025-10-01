@@ -4,11 +4,13 @@ type PagerDotsProps = {
   count: number;
   currentIndex: number;
   onSelect: (index: number) => void;
+  className?: string;
 };
 
-export const PagerDots = ({ count, currentIndex, onSelect }: PagerDotsProps) => {
+export const PagerDots = ({ count, currentIndex, onSelect, className }: PagerDotsProps) => {
+  const containerClassName = [styles.container, className].filter(Boolean).join(' ');
   return (
-    <div className={styles.container} role="tablist" aria-label="Списки покупок">
+    <div className={containerClassName} role="tablist" aria-label="Списки покупок">
       {Array.from({ length: count }, (_, index) => {
         const isActive = index === currentIndex;
         return (
