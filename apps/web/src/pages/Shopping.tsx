@@ -397,6 +397,7 @@ const Shopping = () => {
           onTitleChange={(value) => setAddFormState((prev) => ({ ...prev, title: value }))}
           onSubmit={addItem}
           onCancel={closeAddDialog}
+          autoFocusTitle={isDesktop}
         />
       </Dialog>
 
@@ -412,6 +413,7 @@ const Shopping = () => {
             onChange={(value) => setRenameState((prev) => (prev ? { ...prev, value } : prev))}
             onSubmit={applyRename}
             onCancel={cancelRename}
+            autoFocusInput={isDesktop}
           />
         ) : null}
       </Dialog>

@@ -8,9 +8,16 @@ type RenameItemFormProps = {
   onChange: (value: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
+  autoFocusInput?: boolean;
 };
 
-export const RenameItemForm = ({ value, onChange, onSubmit, onCancel }: RenameItemFormProps) => {
+export const RenameItemForm = ({
+  value,
+  onChange,
+  onSubmit,
+  onCancel,
+  autoFocusInput = false
+}: RenameItemFormProps) => {
   const isDisabled = value.trim().length === 0;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -27,7 +34,7 @@ export const RenameItemForm = ({ value, onChange, onSubmit, onCancel }: RenameIt
         label="Название"
         value={value}
         onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
-        autoFocus
+        autoFocus={autoFocusInput}
         required
       />
       <div className={styles.actions}>

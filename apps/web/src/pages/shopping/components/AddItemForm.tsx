@@ -16,6 +16,7 @@ type AddItemFormProps = {
   onTitleChange: (value: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
+  autoFocusTitle?: boolean;
 };
 
 export const AddItemForm = ({
@@ -24,7 +25,8 @@ export const AddItemForm = ({
   onCategoryChange,
   onTitleChange,
   onSubmit,
-  onCancel
+  onCancel,
+  autoFocusTitle = false
 }: AddItemFormProps) => {
   const isSubmitDisabled = useMemo(() => state.title.trim().length === 0, [state.title]);
 
@@ -59,7 +61,7 @@ export const AddItemForm = ({
           value={state.title}
           onChange={(event: ChangeEvent<HTMLInputElement>) => onTitleChange(event.target.value)}
           placeholder="Что добавить?"
-          autoFocus
+          autoFocus={autoFocusTitle}
           required
         />
       </div>
