@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import styles from './shopping/ShoppingLayout.module.css';
 import {
@@ -59,8 +59,17 @@ const clampPosition = (position: { x: number; y: number }) => {
 };
 
 const Shopping = () => {
-  const [lists, setLists] = useState<ShoppingListData[]>(() => createInitialShoppingLists());
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const initialListsRef = useRef<ShoppingListData[] | null>(null);
+  if (initialListsRef.current === null) {
+    initialListsRef.current = createInitialShoppingLists();
+  }
+
+  const [lists, setLists] = useState<ShoppingListData[]>(
+    () => initialListsRef.current as ShoppingListData[]
+  );
+  const [activeListId, setActiveListId] = useState<string>(
+    () => initialListsRef.current?.[0]?.title ?? ''
+  );
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -74,7 +83,25 @@ const Shopping = () => {
   const [renameState, setRenameState] = useState<RenameState | null>(null);
 
   const listCount = lists.length;
+  const currentIndex = useMemo(() => {
+    if (listCount === 0) {
+      return 0;
+    }
+    const foundIndex = lists.findIndex((list) => list.title === activeListId);
+    return foundIndex === -1 ? 0 : foundIndex;
+  }, [activeListId, listCount, lists]);
   const currentList = lists[currentIndex] ?? lists[0];
+
+  useEffect(() => {
+    if (!listCount) {
+      return;
+    }
+
+    const isActiveValid = lists.some((list) => list.title === activeListId);
+    if (!isActiveValid) {
+      setActiveListId(lists[0]?.title ?? '');
+    }
+  }, [activeListId, listCount, lists]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -91,9 +118,22 @@ const Shopping = () => {
 
   useEffect(() => {
     if (isDesktop) {
-      setCurrentIndex(0);
+      setActiveListId(lists[0]?.title ?? '');
     }
-  }, [isDesktop]);
+  }, [isDesktop, lists]);
+
+  const selectListByIndex = useCallback(
+    (index: number) => {
+      setActiveListId((prev) => {
+        const target = lists[index];
+        if (!target) {
+          return prev;
+        }
+        return target.title;
+      });
+    },
+    [lists]
+  );
 
   const handleToggleItem = useCallback((listIndex: number, itemId: string) => {
     setLists((prevLists) =>
@@ -220,15 +260,12 @@ const Shopping = () => {
       done: false
     };
 
-    let addedIndex = -1;
-
     setLists((prevLists) =>
       prevLists.map((list, index) => {
         if (list.title !== addFormState.category) {
           return list;
         }
 
-        addedIndex = index;
         return {
           ...list,
           items: sortItems([...list.items, newItem])
@@ -236,12 +273,8 @@ const Shopping = () => {
       })
     );
 
-    if (!isDesktop && addedIndex !== -1 && addedIndex !== currentIndex) {
-      setCurrentIndex(addedIndex);
-    }
-
     closeAddDialog();
-  }, [addFormState, closeAddDialog, currentIndex, isDesktop]);
+  }, [addFormState, closeAddDialog]);
 
   const categoryOptions = useMemo(() => lists.map((list) => list.title), [lists]);
 
@@ -270,8 +303,10 @@ const Shopping = () => {
       const target = eventData.event?.target as HTMLElement | null;
       console.log('[shopping] swiping', target?.tagName ?? 'unknown', eventData.dir);
     },
-    onSwipedLeft: () => setCurrentIndex((index) => Math.min(Math.max(listCount - 1, 0), index + 1)),
-    onSwipedRight: () => setCurrentIndex((index) => Math.max(0, index - 1)),
+    onSwipedLeft: () =>
+      selectListByIndex(Math.min(Math.max(listCount - 1, 0), currentIndex + 1)),
+    onSwipedRight: () =>
+      selectListByIndex(Math.max(0, currentIndex - 1)),
     onSwiped: (eventData) => {
       if (!isSwipeDebugEnabled) {
         return;
@@ -324,19 +359,28 @@ const Shopping = () => {
             <div className={`${styles.mobileTrack} shopping-track`} style={trackStyle}>
               {lists.map((list, index) => (
                 <div key={list.title} className={styles.mobilePanel}>
-                  <Checklist
-                    title={list.title}
-                    items={list.items}
-                    showTitle={false}
-                    onToggle={(itemId) => handleToggleItem(index, itemId)}
-                    onAdd={() => openAddDialog(list.title)}
-                    onOpenActions={(item, position) => openContextMenu(index, item, position)}
-                  />
+                  <div className={styles.mobilePanelInner}>
+                    <Checklist
+                      title={list.title}
+                      items={list.items}
+                      showTitle={false}
+                      onToggle={(itemId) => handleToggleItem(index, itemId)}
+                      onAdd={() => openAddDialog(list.title)}
+                      onOpenActions={(item, position) => openContextMenu(index, item, position)}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-          <PagerDots count={listCount} currentIndex={currentIndex} onSelect={setCurrentIndex} />
+          <div className={styles.mobileFooter}>
+            <PagerDots
+              count={listCount}
+              currentIndex={currentIndex}
+              onSelect={selectListByIndex}
+              className={styles.mobileFooterDots}
+            />
+          </div>
         </div>
       )}
 

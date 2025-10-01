@@ -8,6 +8,8 @@
   box-shadow: var(--app-shadow-low);
   border: 1px solid rgba(15, 23, 42, 0.08);
   min-height: 100%;
+  width: 100%;
+  min-width: 0;
 }
 
 .heading {
@@ -26,4 +28,32 @@
 
 .footer {
   margin-top: auto;
+}
+
+@media (max-width: 767px) {
+  .panel {
+    height: 100%;
+  }
+
+  .items {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+    margin-right: -4px;
+    padding-bottom: 24px;
+  }
+
+  .footer {
+    position: sticky;
+    bottom: 0;
+    background: linear-gradient(
+      180deg,
+      rgba(247, 249, 246, 0) 0%,
+      rgba(247, 249, 246, 0.92) 60%,
+      var(--app-color-surface) 100%
+    );
+    padding-top: 16px;
+    margin-top: 0;
+  }
 }
