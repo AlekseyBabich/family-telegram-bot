@@ -261,6 +261,8 @@ export const ChecklistItem = ({ item, onToggle, onOpenActions }: ChecklistItemPr
       role="button"
       tabIndex={0}
       aria-pressed={item.done}
+      // Keep horizontal swipe gestures available even when they start on the item itself.
+      style={{ touchAction: 'pan-y' }}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       onPointerDown={handlePointerDown}
