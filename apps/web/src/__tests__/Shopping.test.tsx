@@ -31,7 +31,7 @@ describe('Shopping page responsive behaviour', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Еда' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'ЕДА' })).toBeInTheDocument();
 
     const firstDot = screen.getByRole('button', { name: 'Перейти к списку 1' });
     const secondDot = screen.getByRole('button', { name: 'Перейти к списку 2' });

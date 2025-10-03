@@ -125,16 +125,29 @@ const Shopping = () => {
 
   const selectListByIndex = useCallback(
     (index: number) => {
-      setActiveListId((prev) => {
-        const target = lists[index];
-        if (!target) {
-          return prev;
-        }
-        return target.title;
-      });
+      const total = lists.length;
+      if (total === 0) {
+        return;
+      }
+
+      const normalizedIndex = ((index % total) + total) % total;
+      const target = lists[normalizedIndex];
+      if (!target) {
+        return;
+      }
+
+      setActiveListId(target.title);
     },
     [lists]
   );
+
+  const goToNextList = useCallback(() => {
+    selectListByIndex(currentIndex + 1);
+  }, [currentIndex, selectListByIndex]);
+
+  const goToPreviousList = useCallback(() => {
+    selectListByIndex(currentIndex - 1);
+  }, [currentIndex, selectListByIndex]);
 
   const handleToggleItem = useCallback((listIndex: number, itemId: string) => {
     setLists((prevLists) =>
@@ -306,16 +319,10 @@ const Shopping = () => {
       console.log('[shopping] swiping', target?.tagName ?? 'unknown', eventData.dir);
     },
     onSwipedLeft: () => {
-      if (currentIndex >= listCount - 1) {
-        return;
-      }
-      selectListByIndex(currentIndex + 1);
+      goToNextList();
     },
     onSwipedRight: () => {
-      if (currentIndex <= 0) {
-        return;
-      }
-      selectListByIndex(currentIndex - 1);
+      goToPreviousList();
     },
     onSwiped: (eventData) => {
       if (!isSwipeDebugEnabled) {
@@ -349,7 +356,29 @@ const Shopping = () => {
   return (
     <section className={styles.page}>
       <header className={styles.header}>
-        {!isDesktop ? <h1 className={styles.currentTitle}>{currentList.title}</h1> : null}
+        {!isDesktop && listCount > 0 ? (
+          <div className={styles.mobileHeaderNav}>
+            <button
+              type="button"
+              className={styles.navButton}
+              onClick={goToPreviousList}
+              aria-label="Предыдущий список"
+              disabled={listCount <= 1}
+            >
+              <span aria-hidden="true">‹</span>
+            </button>
+            <h1 className={styles.currentTitle}>{currentList.title.toUpperCase()}</h1>
+            <button
+              type="button"
+              className={styles.navButton}
+              onClick={goToNextList}
+              aria-label="Следующий список"
+              disabled={listCount <= 1}
+            >
+              <span aria-hidden="true">›</span>
+            </button>
+          </div>
+        ) : null}
       </header>
       {isDesktop ? (
         <div className={styles.desktopGrid} aria-label="Списки покупок">
