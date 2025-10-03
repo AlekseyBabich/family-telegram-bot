@@ -3,9 +3,9 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(247, 249, 246, 0.8);
+  background: rgba(247, 249, 246, 0.6);
   backdrop-filter: blur(12px);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
   pointer-events: auto;

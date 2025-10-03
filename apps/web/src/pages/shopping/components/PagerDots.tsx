@@ -9,13 +9,9 @@ type PagerDotsProps = {
 
 export const PagerDots = ({ count, currentIndex, onSelect, className }: PagerDotsProps) => {
   const containerClassName = [styles.container, className].filter(Boolean).join(' ');
+
   return (
-    <div
-      className={containerClassName}
-      role="tablist"
-      aria-label="Списки покупок"
-      style={{ pointerEvents: 'auto' }}
-    >
+    <div className={containerClassName} role="tablist" aria-label="Списки покупок" style={{ pointerEvents: 'auto' }}>
       {Array.from({ length: count }, (_, index) => {
         const isActive = index === currentIndex;
         return (
