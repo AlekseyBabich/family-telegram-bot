@@ -49,9 +49,9 @@ describe('Shopping mobile swipe container', () => {
 
   const getTrack = () => screen.getByTestId('shopping-track');
 
-  const getFirstChecklistItem = () => {
-    const firstScreen = screen.getByTestId('shopping-screen-0');
-    return within(firstScreen).getAllByRole('button')[0];
+  const getChecklistItemAt = (screenIndex: number) => {
+    const screenElement = screen.getByTestId(`shopping-screen-${screenIndex}`);
+    return within(screenElement).getAllByRole('button')[0];
   };
 
   it('renders the first screen by default', async () => {
@@ -81,17 +81,53 @@ describe('Shopping mobile swipe container', () => {
     await waitFor(() => expect(secondPagerDot).toHaveAttribute('aria-pressed', 'true'));
   });
 
+  it('cycles screens when tapping the navigation arrows', async () => {
+    renderShopping();
+
+    const nextButton = await screen.findByRole('button', { name: 'Следующий список' });
+    const secondPagerDot = await screen.findByRole('button', { name: 'Перейти к списку 2' });
+    const thirdPagerDot = await screen.findByRole('button', { name: 'Перейти к списку 3' });
+
+    fireEvent.click(nextButton);
+    await waitFor(() => expect(getTrack().style.transform).toContain('-100%'));
+    await waitFor(() => expect(secondPagerDot).toHaveAttribute('aria-pressed', 'true'));
+
+    fireEvent.click(nextButton);
+    await waitFor(() => expect(getTrack().style.transform).toContain('-200%'));
+    await waitFor(() => expect(thirdPagerDot).toHaveAttribute('aria-pressed', 'true'));
+
+    fireEvent.click(nextButton);
+    await waitFor(() => expect(getTrack().style.transform).toContain('0%'));
+    const firstPagerDot = await screen.findByRole('button', { name: 'Перейти к списку 1' });
+    await waitFor(() => expect(firstPagerDot).toHaveAttribute('aria-pressed', 'true'));
+  });
+
+  it('updates the header with an uppercase category name for the active screen', async () => {
+    renderShopping();
+
+    const heading = await screen.findByRole('heading', { level: 1 });
+    expect(heading).toHaveTextContent('ЕДА');
+
+    const nextButton = await screen.findByRole('button', { name: 'Следующий список' });
+
+    fireEvent.click(nextButton);
+    await waitFor(() => expect(heading).toHaveTextContent('БЫТОВОЕ'));
+
+    fireEvent.click(nextButton);
+    await waitFor(() => expect(heading).toHaveTextContent('ВЕЩИ'));
+  });
+
   it('marks checklist items with pan-y touch action so swipes start over them', () => {
     renderShopping();
 
-    const firstItem = getFirstChecklistItem();
+    const firstItem = getChecklistItemAt(0);
     expect(firstItem.style.touchAction).toBe('pan-y');
   });
 
   it('detects a horizontal swipe that starts on a checklist item', async () => {
     renderShopping();
 
-    const firstItem = getFirstChecklistItem();
+    const firstItem = getChecklistItemAt(0);
 
     dispatchSwipe(
       firstItem,
@@ -106,10 +142,55 @@ describe('Shopping mobile swipe container', () => {
     await waitFor(() => expect(getTrack().style.transform).toContain('-100%'));
   });
 
+  it('wraps to the first screen after swiping left on the last screen', async () => {
+    renderShopping();
+
+    const nextButton = await screen.findByRole('button', { name: 'Следующий список' });
+    fireEvent.click(nextButton);
+    fireEvent.click(nextButton);
+
+    await waitFor(() => expect(getTrack().style.transform).toContain('-200%'));
+
+    const lastItem = getChecklistItemAt(2);
+    dispatchSwipe(
+      lastItem,
+      { x: 260, y: 220 },
+      [
+        { x: 210, y: 216 },
+        { x: 160, y: 212 }
+      ],
+      { x: 100, y: 208 }
+    );
+
+    await waitFor(() => expect(getTrack().style.transform).toContain('0%'));
+    const firstPagerDot = await screen.findByRole('button', { name: 'Перейти к списку 1' });
+    await waitFor(() => expect(firstPagerDot).toHaveAttribute('aria-pressed', 'true'));
+  });
+
+  it('wraps to the last screen after swiping right on the first screen', async () => {
+    renderShopping();
+
+    const firstItem = getChecklistItemAt(0);
+
+    dispatchSwipe(
+      firstItem,
+      { x: 100, y: 220 },
+      [
+        { x: 150, y: 224 },
+        { x: 200, y: 228 }
+      ],
+      { x: 250, y: 232 }
+    );
+
+    await waitFor(() => expect(getTrack().style.transform).toContain('-200%'));
+    const thirdPagerDot = await screen.findByRole('button', { name: 'Перейти к списку 3' });
+    await waitFor(() => expect(thirdPagerDot).toHaveAttribute('aria-pressed', 'true'));
+  });
+
   it('ignores a mostly vertical drag that starts on a checklist item', async () => {
     renderShopping();
 
-    const firstItem = getFirstChecklistItem();
+    const firstItem = getChecklistItemAt(0);
     const initialTransform = getTrack().style.transform;
 
     dispatchSwipe(
@@ -155,76 +236,6 @@ describe('Shopping mobile swipe container', () => {
     fireEvent.click(firstItem);
 
     await waitFor(() => expect(getTrack().style.transform).toBe(initialTransform));
-  });
-
-  it('stops at the bounds when swiping beyond available screens', async () => {
-    renderShopping();
-
-    const content = screen.getByTestId('shopping-mobile-content');
-
-    // Swipe right on the first screen – should stay at index 0.
-    dispatchSwipe(
-      content,
-      { x: 100, y: 220 },
-      [
-        { x: 150, y: 224 },
-        { x: 200, y: 228 }
-      ],
-      { x: 250, y: 232 }
-    );
-
-    await waitFor(() => expect(getTrack().style.transform).toContain('0%'));
-
-    // Swipe left twice to reach the last screen.
-    dispatchSwipe(
-      content,
-      { x: 260, y: 220 },
-      [
-        { x: 210, y: 216 },
-        { x: 160, y: 212 }
-      ],
-      { x: 120, y: 208 }
-    );
-
-    await waitFor(() => expect(getTrack().style.transform).toContain('-100%'));
-
-    dispatchSwipe(
-      content,
-      { x: 260, y: 220 },
-      [
-        { x: 210, y: 216 },
-        { x: 160, y: 212 }
-      ],
-      { x: 100, y: 208 }
-    );
-
-    await waitFor(() => expect(getTrack().style.transform).toContain('-200%'));
-
-    // One more left swipe should keep us at the last screen.
-    dispatchSwipe(
-      content,
-      { x: 250, y: 220 },
-      [
-        { x: 200, y: 216 },
-        { x: 150, y: 212 }
-      ],
-      { x: 90, y: 208 }
-    );
-
-    await waitFor(() => expect(getTrack().style.transform).toContain('-200%'));
-
-    // Swiping right once should return to the middle screen.
-    dispatchSwipe(
-      content,
-      { x: 100, y: 220 },
-      [
-        { x: 150, y: 224 },
-        { x: 200, y: 228 }
-      ],
-      { x: 240, y: 232 }
-    );
-
-    await waitFor(() => expect(getTrack().style.transform).toContain('-100%'));
   });
 
   it('keeps pager position when interacting with inputs inside other lists', async () => {
