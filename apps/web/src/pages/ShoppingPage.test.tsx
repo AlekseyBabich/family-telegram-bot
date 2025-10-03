@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Shopping from './Shopping';
 import { createInitialShoppingLists } from './shoppingData';
+import * as shoppingDataModule from './shoppingData';
 
 type SwipePoint = { x: number; y: number };
 
@@ -227,7 +228,7 @@ describe('Shopping mobile swipe container', () => {
 
     const secondPagerDot = await screen.findByRole('button', { name: 'Перейти к списку 2' });
     await waitFor(() => expect(secondPagerDot).toHaveAttribute('aria-pressed', 'true'));
-    const dotsContainer = overlay.querySelector('div') as HTMLElement | null;
+    const dotsContainer = overlay.querySelector('[role="tablist"]') as HTMLElement | null;
     expect(dotsContainer).not.toBeNull();
     expect(window.getComputedStyle(dotsContainer as HTMLElement).pointerEvents).toBe('auto');
 
@@ -255,6 +256,149 @@ describe('Shopping mobile swipe container', () => {
     );
 
     await waitFor(() => expect(firstPagerDot).toHaveAttribute('aria-pressed', 'true'));
+  });
+
+  it('allows horizontal swipes that start on the pager dots and ignores vertical drags there', async () => {
+    renderShopping();
+
+    const dots = await screen.findByRole('tablist', { name: 'Списки покупок' });
+    const content = screen.getByTestId('shopping-mobile-content');
+
+    dispatchSwipe(
+      dots,
+      { x: 220, y: 420 },
+      [
+        { x: 190, y: 416 },
+        { x: 150, y: 412 }
+      ],
+      { x: 120, y: 408 }
+    );
+
+    await waitFor(() => expect(getTrack().style.transform).toContain('-100%'));
+
+    const afterHorizontal = getTrack().style.transform;
+
+    dispatchSwipe(
+      dots,
+      { x: 200, y: 420 },
+      [
+        { x: 202, y: 460 },
+        { x: 204, y: 500 }
+      ],
+      { x: 206, y: 540 }
+    );
+
+    await waitFor(() => expect(getTrack().style.transform).toBe(afterHorizontal));
+
+    // Ensure swiping elsewhere still works after interacting with dots.
+    dispatchSwipe(
+      content,
+      { x: 240, y: 240 },
+      [
+        { x: 200, y: 236 },
+        { x: 150, y: 232 }
+      ],
+      { x: 110, y: 228 }
+    );
+
+    await waitFor(() => expect(getTrack().style.transform).toContain('-200%'));
+  });
+
+  it('allows swiping in the blank space below the add button for short lists', async () => {
+    vi.spyOn(shoppingDataModule, 'createInitialShoppingLists').mockReturnValue([
+      {
+        title: 'Короткий',
+        items: [
+          {
+            id: 'short-1',
+            title: 'Единичный предмет',
+            done: false
+          }
+        ]
+      },
+      {
+        title: 'Второй',
+        items: [
+          {
+            id: 'second-1',
+            title: 'Другой предмет',
+            done: false
+          }
+        ]
+      }
+    ]);
+
+    renderShopping();
+
+    const list = getListForScreen(0);
+
+    dispatchSwipe(
+      list,
+      { x: 240, y: 620 },
+      [
+        { x: 200, y: 616 },
+        { x: 150, y: 612 }
+      ],
+      { x: 110, y: 608 }
+    );
+
+    await waitFor(() => expect(getTrack().style.transform).toContain('-100%'));
+
+    const afterHorizontal = getTrack().style.transform;
+
+    dispatchSwipe(
+      list,
+      { x: 200, y: 620 },
+      [
+        { x: 202, y: 660 },
+        { x: 204, y: 700 }
+      ],
+      { x: 206, y: 740 }
+    );
+
+    await waitFor(() => expect(getTrack().style.transform).toBe(afterHorizontal));
+  });
+
+  it('renders the empty state message when a list has no items and keeps paging functional', async () => {
+    vi.spyOn(shoppingDataModule, 'createInitialShoppingLists').mockReturnValue([
+      {
+        title: 'Пустой',
+        items: []
+      },
+      {
+        title: 'Соседний',
+        items: [
+          {
+            id: 'neighbor-1',
+            title: 'Соседний предмет',
+            done: false
+          }
+        ]
+      }
+    ]);
+
+    renderShopping();
+
+    const firstList = getListForScreen(0);
+    expect(within(firstList).getByText('список пуст')).toBeInTheDocument();
+    expect(within(firstList).getByRole('button', { name: '+ добавить' })).toBeInTheDocument();
+
+    const content = screen.getByTestId('shopping-mobile-content');
+
+    dispatchSwipe(
+      content,
+      { x: 240, y: 240 },
+      [
+        { x: 200, y: 236 },
+        { x: 150, y: 232 }
+      ],
+      { x: 110, y: 228 }
+    );
+
+    await waitFor(() => expect(getTrack().style.transform).toContain('-100%'));
+
+    const secondList = getListForScreen(1);
+    expect(within(secondList).queryByText('список пуст')).not.toBeInTheDocument();
   });
 
   it('keeps the add button trailing items when list content changes', async () => {

@@ -26,6 +26,16 @@
   flex-direction: column;
 }
 
+.emptyState {
+  margin: 0;
+  padding: 24px 12px 12px;
+  text-align: center;
+  color: var(--app-color-text-secondary);
+  font: var(--app-typography-body);
+  pointer-events: none;
+  user-select: none;
+}
+
 .addItem {
   list-style: none;
   margin: 12px 0 0 0;
@@ -44,5 +54,6 @@
     padding-right: 4px;
     margin-right: -4px;
     padding-bottom: calc(24px + 56px);
+    touch-action: pan-y;
   }
 }

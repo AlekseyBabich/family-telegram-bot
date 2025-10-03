@@ -23,6 +23,11 @@ export const Checklist = ({
   <div className={styles.panel}>
     {showTitle ? <h2 className={styles.heading}>{title}</h2> : null}
     <ul className={styles.items}>
+      {items.length === 0 ? (
+        <li className={styles.emptyState} aria-live="polite">
+          список пуст
+        </li>
+      ) : null}
       {items.map((item) => (
         <ChecklistItem
           key={item.id}
