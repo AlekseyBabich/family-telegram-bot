@@ -49,6 +49,11 @@ describe('Shopping mobile swipe container', () => {
 
   const getTrack = () => screen.getByTestId('shopping-track');
 
+  const getFirstChecklistItem = () => {
+    const firstScreen = screen.getByTestId('shopping-screen-0');
+    return within(firstScreen).getAllByRole('button')[0];
+  };
+
   it('renders the first screen by default', async () => {
     renderShopping();
 
@@ -74,6 +79,50 @@ describe('Shopping mobile swipe container', () => {
     await waitFor(() => expect(getTrack().style.transform).toContain('-100%'));
     const secondPagerDot = await screen.findByRole('button', { name: 'Перейти к списку 2' });
     await waitFor(() => expect(secondPagerDot).toHaveAttribute('aria-pressed', 'true'));
+  });
+
+  it('marks checklist items with pan-y touch action so swipes start over them', () => {
+    renderShopping();
+
+    const firstItem = getFirstChecklistItem();
+    expect(firstItem.style.touchAction).toBe('pan-y');
+  });
+
+  it('detects a horizontal swipe that starts on a checklist item', async () => {
+    renderShopping();
+
+    const firstItem = getFirstChecklistItem();
+
+    dispatchSwipe(
+      firstItem,
+      { x: 240, y: 240 },
+      [
+        { x: 200, y: 236 },
+        { x: 150, y: 232 }
+      ],
+      { x: 110, y: 228 }
+    );
+
+    await waitFor(() => expect(getTrack().style.transform).toContain('-100%'));
+  });
+
+  it('ignores a mostly vertical drag that starts on a checklist item', async () => {
+    renderShopping();
+
+    const firstItem = getFirstChecklistItem();
+    const initialTransform = getTrack().style.transform;
+
+    dispatchSwipe(
+      firstItem,
+      { x: 180, y: 240 },
+      [
+        { x: 176, y: 280 },
+        { x: 172, y: 320 }
+      ],
+      { x: 170, y: 360 }
+    );
+
+    await waitFor(() => expect(getTrack().style.transform).toBe(initialTransform));
   });
 
   it('ignores a mostly vertical swipe gesture', async () => {
