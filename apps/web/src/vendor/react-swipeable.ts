@@ -27,6 +27,7 @@ export type SwipeableConfig = {
   delta?: number;
   preventScrollOnSwipe?: boolean;
   trackTouch?: boolean;
+  trackMouse?: boolean;
   touchEventOptions?: AddEventListenerOptions;
   rotationAngle?: number;
 };
@@ -52,11 +53,15 @@ type SwipeState = {
 };
 
 const DEFAULT_CONFIG: Required<
-  Pick<SwipeableConfig, 'delta' | 'preventScrollOnSwipe' | 'trackTouch' | 'rotationAngle'>
+  Pick<
+    SwipeableConfig,
+    'delta' | 'preventScrollOnSwipe' | 'trackTouch' | 'trackMouse' | 'rotationAngle'
+  >
 > = {
   delta: 10,
   preventScrollOnSwipe: false,
   trackTouch: true,
+  trackMouse: false,
   rotationAngle: 0,
 };
 
@@ -243,39 +248,55 @@ export const useSwipeable = (config: SwipeableConfig): SwipeableHandlers => {
     [endTracking, resetState],
   );
 
+  const shouldHandlePointerType = useCallback((pointerType: string) => {
+    if (pointerType === 'touch' || pointerType === 'pen') {
+      return true;
+    }
+
+    if (pointerType === 'mouse') {
+      return configRef.current.trackMouse;
+    }
+
+    return false;
+  }, []);
+
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<Element>) => {
-      if (event.pointerType !== 'touch') {
+      if (!shouldHandlePointerType(event.pointerType)) {
+        return;
+      }
+
+      if (event.pointerType === 'mouse' && event.buttons !== 1) {
         return;
       }
 
       startTracking(event.clientX, event.clientY, event.pointerId);
     },
-    [startTracking],
+    [shouldHandlePointerType, startTracking],
   );
 
   const handlePointerMove = useCallback(
     (event: ReactPointerEvent<Element>) => {
       const state = stateRef.current;
-      if (event.pointerType !== 'touch' || state.pointerId !== event.pointerId) {
+      if (!shouldHandlePointerType(event.pointerType) || state.pointerId !== event.pointerId) {
         return;
       }
 
       handleMove(event, event.clientX, event.clientY);
     },
-    [handleMove],
+    [handleMove, shouldHandlePointerType],
   );
 
   const handlePointerEnd = useCallback(
     (event: ReactPointerEvent<Element>) => {
       const state = stateRef.current;
-      if (event.pointerType !== 'touch' || state.pointerId !== event.pointerId) {
+      if (!shouldHandlePointerType(event.pointerType) || state.pointerId !== event.pointerId) {
         return;
       }
 
       endTracking(event, event.clientX, event.clientY);
     },
-    [endTracking],
+    [endTracking, shouldHandlePointerType],
   );
 
   const handlers = useMemo<SwipeableHandlers>(

@@ -83,6 +83,7 @@ const Shopping = () => {
   const [renameState, setRenameState] = useState<RenameState | null>(null);
 
   const listCount = lists.length;
+  // apps/web/src/pages/Shopping.tsx: currentIndex mirrors the horizontal pager position for swipe gestures.
   const currentIndex = useMemo(() => {
     if (listCount === 0) {
       return 0;
@@ -286,6 +287,7 @@ const Shopping = () => {
     return new URLSearchParams(window.location.search).get('debugSwipe') === '1';
   }, []);
 
+  // apps/web/src/pages/Shopping.tsx: mobileContent (see render) spans the full swipe surface, so handlers live here.
   const swipeHandlers = useSwipeable({
     onSwipeStart: (eventData) => {
       if (!isSwipeDebugEnabled) {
@@ -303,10 +305,18 @@ const Shopping = () => {
       const target = eventData.event?.target as HTMLElement | null;
       console.log('[shopping] swiping', target?.tagName ?? 'unknown', eventData.dir);
     },
-    onSwipedLeft: () =>
-      selectListByIndex(Math.min(Math.max(listCount - 1, 0), currentIndex + 1)),
-    onSwipedRight: () =>
-      selectListByIndex(Math.max(0, currentIndex - 1)),
+    onSwipedLeft: () => {
+      if (currentIndex >= listCount - 1) {
+        return;
+      }
+      selectListByIndex(currentIndex + 1);
+    },
+    onSwipedRight: () => {
+      if (currentIndex <= 0) {
+        return;
+      }
+      selectListByIndex(currentIndex - 1);
+    },
     onSwiped: (eventData) => {
       if (!isSwipeDebugEnabled) {
         return;
@@ -318,6 +328,7 @@ const Shopping = () => {
     delta: 12,
     preventScrollOnSwipe: true,
     trackTouch: true,
+    trackMouse: true,
     touchEventOptions: { passive: false },
     rotationAngle: 0
   });
@@ -354,11 +365,25 @@ const Shopping = () => {
           ))}
         </div>
       ) : (
-        <div className={`${styles.mobileContent} shopping-content`} {...swipeHandlers}>
+        // apps/web/src/pages/Shopping.tsx: handlers live on mobileContent because CSS (touch-action: pan-y)
+        // is applied there to keep vertical scroll responsive while capturing horizontal swipes.
+        <div
+          className={`${styles.mobileContent} shopping-content`}
+          data-testid="shopping-mobile-content"
+          {...swipeHandlers}
+        >
           <div className={styles.mobileTrackWrapper}>
-            <div className={`${styles.mobileTrack} shopping-track`} style={trackStyle}>
+            <div
+              className={`${styles.mobileTrack} shopping-track`}
+              style={trackStyle}
+              data-testid="shopping-track"
+            >
               {lists.map((list, index) => (
-                <div key={list.title} className={styles.mobilePanel}>
+                <div
+                  key={list.title}
+                  className={styles.mobilePanel}
+                  data-testid={`shopping-screen-${index}`}
+                >
                   <div className={styles.mobilePanelInner}>
                     <Checklist
                       title={list.title}

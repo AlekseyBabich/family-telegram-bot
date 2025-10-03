@@ -109,6 +109,11 @@ https://api.telegram.org/bot<ВАШ_BOT_TOKEN>/setWebhook?url=https://<firebase-
 - `npm --workspace apps/web run preview` — предпросмотр production-сборки.
 - `npm --workspace apps/web run test` — прогонит vitest и smoke-тесты маршрутов.
 
+### Gesture notes (apps/web)
+- Страница покупок использует `useSwipeable` с опциями `preventScrollOnSwipe: true`, `trackMouse: true` и `delta: 12`, чтобы обеспечить плавные горизонтальные свайпы и сохранить вертикальный скролл списков.
+- Контейнер `.mobileContent` получает `touch-action: pan-y`, поэтому вертикальные жесты работают внутри чеклистов, а горизонтальные передаются свайперу.
+- Для проверки жестов выполните `npm --workspace apps/web run test` — добавлены unit-тесты, моделирующие горизонтальные и вертикальные свайпы, а также клики и работу на границах.
+
 ### Маршруты
 Приложение использует `HashRouter` и открывается с вкладки «Покупки».
 - `#/shopping` — страница «Покупки» с единственным заголовком «Покупки» по центру.
