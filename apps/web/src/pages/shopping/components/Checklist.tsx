@@ -33,11 +33,11 @@ export const Checklist = ({
           }
         />
       ))}
+      <li className={styles.addItem} data-testid="shopping-add-entry">
+        <Button variant="secondary" onClick={onAdd} fullWidth>
+          + добавить
+        </Button>
+      </li>
     </ul>
-    <div className={styles.footer}>
-      <Button variant="secondary" onClick={onAdd} fullWidth>
-        + добавить
-      </Button>
-    </div>
   </div>
 );

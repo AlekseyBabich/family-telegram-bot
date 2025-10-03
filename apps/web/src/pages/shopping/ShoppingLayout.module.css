@@ -118,17 +118,23 @@
 }
 
 .mobileFooter {
+  position: fixed;
+  left: 0;
+  bottom: calc(env(safe-area-inset-bottom) + 16px);
   width: 100%;
   display: flex;
   justify-content: center;
-  padding: 0 16px 12px 16px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  padding: 0 16px;
   box-sizing: border-box;
+  pointer-events: none;
+  z-index: 30;
 }
 .mobileFooterDots {
-  width: 100%;
+  pointer-events: auto;
+  width: auto;
   max-width: 520px;
-  margin: 0 auto;
+  display: flex;
+  justify-content: center;
 }
 
 @media (min-width: 768px) {
@@ -137,6 +143,10 @@
   }
 
   .mobileContent {
+    display: none;
+  }
+
+  .mobileFooter {
     display: none;
   }
 }

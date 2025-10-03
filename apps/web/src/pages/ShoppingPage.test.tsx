@@ -54,6 +54,23 @@ describe('Shopping mobile swipe container', () => {
     return within(screenElement).getAllByRole('button')[0];
   };
 
+  const getListForScreen = (screenIndex: number) => {
+    const screenElement = screen.getByTestId(`shopping-screen-${screenIndex}`);
+    return within(screenElement).getAllByRole('list')[0];
+  };
+
+  const expectAddButtonAsLastItem = (screenIndex: number) => {
+    const list = getListForScreen(screenIndex);
+    const lastElement = list.lastElementChild as HTMLElement | null;
+    expect(lastElement).not.toBeNull();
+    const addButton = within(lastElement as HTMLElement).getByRole('button', { name: '+ добавить' });
+    expect(addButton).toBeInTheDocument();
+    const position = window.getComputedStyle(lastElement as HTMLElement).position;
+    expect(position === '' || position === 'static').toBe(true);
+    expect(position).not.toBe('sticky');
+    expect(position).not.toBe('fixed');
+  };
+
   it('renders the first screen by default', async () => {
     renderShopping();
 
@@ -185,6 +202,106 @@ describe('Shopping mobile swipe container', () => {
     await waitFor(() => expect(getTrack().style.transform).toContain('-200%'));
     const thirdPagerDot = await screen.findByRole('button', { name: 'Перейти к списку 3' });
     await waitFor(() => expect(thirdPagerDot).toHaveAttribute('aria-pressed', 'true'));
+  });
+
+  it('keeps pager dots visible while swiping and after wrap-around', async () => {
+    renderShopping();
+
+    const overlay = await screen.findByTestId('shopping-pager-overlay');
+    expect(overlay).toBeInTheDocument();
+    expect(window.getComputedStyle(overlay).pointerEvents).toBe('none');
+
+    const firstPagerDot = await screen.findByRole('button', { name: 'Перейти к списку 1' });
+    expect(firstPagerDot).toHaveAttribute('aria-pressed', 'true');
+
+    const content = screen.getByTestId('shopping-mobile-content');
+    dispatchSwipe(
+      content,
+      { x: 240, y: 240 },
+      [
+        { x: 200, y: 236 },
+        { x: 150, y: 232 }
+      ],
+      { x: 110, y: 228 }
+    );
+
+    const secondPagerDot = await screen.findByRole('button', { name: 'Перейти к списку 2' });
+    await waitFor(() => expect(secondPagerDot).toHaveAttribute('aria-pressed', 'true'));
+    const dotsContainer = overlay.querySelector('div') as HTMLElement | null;
+    expect(dotsContainer).not.toBeNull();
+    expect(window.getComputedStyle(dotsContainer as HTMLElement).pointerEvents).toBe('auto');
+
+    dispatchSwipe(
+      content,
+      { x: 240, y: 240 },
+      [
+        { x: 200, y: 236 },
+        { x: 150, y: 232 }
+      ],
+      { x: 110, y: 228 }
+    );
+
+    const thirdPagerDot = await screen.findByRole('button', { name: 'Перейти к списку 3' });
+    await waitFor(() => expect(thirdPagerDot).toHaveAttribute('aria-pressed', 'true'));
+
+    dispatchSwipe(
+      content,
+      { x: 260, y: 220 },
+      [
+        { x: 210, y: 216 },
+        { x: 160, y: 212 }
+      ],
+      { x: 100, y: 208 }
+    );
+
+    await waitFor(() => expect(firstPagerDot).toHaveAttribute('aria-pressed', 'true'));
+  });
+
+  it('keeps the add button trailing items when list content changes', async () => {
+    renderShopping();
+
+    const lists = createInitialShoppingLists();
+
+    lists.forEach((_, index) => expectAddButtonAsLastItem(index));
+
+    for (let index = 0; index < lists.length; index += 1) {
+      const listElement = getListForScreen(index);
+      const addEntry = within(listElement).getByTestId('shopping-add-entry');
+      const addButton = within(addEntry).getByRole('button', { name: '+ добавить' });
+
+      fireEvent.click(addButton);
+
+      const categorySelect = await screen.findByLabelText('Категория');
+      fireEvent.change(categorySelect, { target: { value: lists[index]?.title ?? '' } });
+
+      const titleInput = await screen.findByLabelText('Название');
+      const newItemTitle = `Новый элемент ${index + 1}`;
+      fireEvent.change(titleInput, { target: { value: newItemTitle } });
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Добавить' }));
+
+      await waitFor(() =>
+        expect(within(getListForScreen(index)).getByRole('button', { name: newItemTitle })).toBeInTheDocument()
+      );
+
+      expectAddButtonAsLastItem(index);
+
+      const createdItem = within(getListForScreen(index)).getByRole('button', {
+        name: newItemTitle
+      });
+
+      fireEvent.contextMenu(createdItem, { clientX: 100, clientY: 100 });
+
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Удалить' }));
+
+      await waitFor(() =>
+        expect(
+          within(getListForScreen(index)).queryByRole('button', { name: newItemTitle })
+        ).not.toBeInTheDocument()
+      );
+
+      expectAddButtonAsLastItem(index);
+    }
   });
 
   it('ignores a mostly vertical drag that starts on a checklist item', async () => {

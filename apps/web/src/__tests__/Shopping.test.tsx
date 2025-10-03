@@ -70,9 +70,12 @@ describe('Shopping page responsive behaviour', () => {
     expect(renderedLists).toHaveLength(initialLists.length);
 
     initialLists.forEach((initialList, index) => {
-      const renderedItems = within(renderedLists[index]).getAllByRole('button');
-      expect(renderedItems).toHaveLength(initialList.items.length);
-      renderedItems.forEach((button) => {
+      const renderedButtons = within(renderedLists[index]).getAllByRole('button');
+      const checklistButtons = renderedButtons.filter((button) =>
+        button.hasAttribute('aria-pressed')
+      );
+      expect(checklistButtons).toHaveLength(initialList.items.length);
+      checklistButtons.forEach((button) => {
         expect(button).toHaveTextContent('❌');
         expect(button).toHaveAttribute('aria-pressed', 'false');
       });
@@ -81,7 +84,11 @@ describe('Shopping page responsive behaviour', () => {
     const firstInitialList = initialLists[0];
     const firstRenderedList = renderedLists[0];
     const firstItemTitle = firstInitialList.items[0]?.title ?? '';
-    const firstItem = within(firstRenderedList).getAllByRole('button')[0];
+    const checklistButtons = within(firstRenderedList)
+      .getAllByRole('button')
+      .filter((button) => button.hasAttribute('aria-pressed'));
+    const firstItem = checklistButtons[0];
+    expect(firstItem).toBeDefined();
     expect(firstItem).toHaveTextContent(firstItemTitle);
 
     fireEvent.click(firstItem);

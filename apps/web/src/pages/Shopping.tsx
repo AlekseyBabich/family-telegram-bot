@@ -427,7 +427,11 @@ const Shopping = () => {
               ))}
             </div>
           </div>
-          <div className={styles.mobileFooter}>
+          <div
+            className={styles.mobileFooter}
+            data-testid="shopping-pager-overlay"
+            style={{ pointerEvents: 'none' }}
+          >
             <PagerDots
               count={listCount}
               currentIndex={currentIndex}
