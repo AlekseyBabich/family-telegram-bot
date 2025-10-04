@@ -118,8 +118,15 @@
 }
 
 .calendar-week-grid {
+  --calendar-week-caption-size: clamp(13px, 3.6vw, 16px);
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    'monday thursday'
+    'tuesday friday'
+    'wednesday saturday'
+    'sunday sunday';
+  grid-auto-rows: 1fr;
   gap: 12px;
 }
 
@@ -148,17 +155,44 @@
   border-width: 2px;
 }
 
-.calendar-week-sunday {
-  grid-column: 1 / -1;
+.calendar-week-day--monday {
+  grid-area: monday;
 }
 
-.calendar-week-day-header {
+.calendar-week-day--tuesday {
+  grid-area: tuesday;
+}
+
+.calendar-week-day--wednesday {
+  grid-area: wednesday;
+}
+
+.calendar-week-day--thursday {
+  grid-area: thursday;
+}
+
+.calendar-week-day--friday {
+  grid-area: friday;
+}
+
+.calendar-week-day--saturday {
+  grid-area: saturday;
+}
+
+.calendar-week-day--sunday,
+.calendar-week-sunday {
+  grid-area: sunday;
+}
+
+.calendar-week-day-caption {
   font-weight: 600;
-  font-size: clamp(14px, 3.8vw, 16px);
+  font-size: var(--calendar-week-caption-size);
   line-height: 1.2;
   text-align: left;
   text-transform: none;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .calendar-week-event-list {
@@ -173,6 +207,20 @@
 }
 
 .calendar-week-event-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 1.2em;
+}
+
+.calendar-week-event-bullet {
+  font-weight: 700;
+  color: var(--app-color-text-primary);
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.calendar-week-event-text {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;

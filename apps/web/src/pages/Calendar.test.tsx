@@ -135,7 +135,7 @@ describe('Calendar page', () => {
     expect(monthButton).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('lays out the week view as 2x3 tiles with full weekday labels and wide Sunday on mobile width', () => {
+  it('lays out the week view with stacked columns and a wide Sunday tile on mobile width', () => {
     setViewportWidth(390);
     render(<Calendar />);
 
@@ -152,6 +152,27 @@ describe('Calendar page', () => {
     const mondayTile = screen.getByTestId('week-day-2024-05-13');
     expect(mondayTile).toHaveTextContent('Понедельник, 13');
     expect(sundayTile).toHaveTextContent('Воскресенье, 19');
+
+    const expectedClassMap: Record<string, string> = {
+      'week-day-2024-05-13': 'calendar-week-day--monday',
+      'week-day-2024-05-14': 'calendar-week-day--tuesday',
+      'week-day-2024-05-15': 'calendar-week-day--wednesday',
+      'week-day-2024-05-16': 'calendar-week-day--thursday',
+      'week-day-2024-05-17': 'calendar-week-day--friday',
+      'week-day-2024-05-18': 'calendar-week-day--saturday',
+      'week-day-2024-05-19': 'calendar-week-day--sunday'
+    };
+
+    Object.entries(expectedClassMap).forEach(([testId, className]) => {
+      expect(screen.getByTestId(testId).className).toContain(className);
+    });
+
+    const captions = weekGrid.querySelectorAll('[data-caption-size="shared"]');
+    expect(captions).toHaveLength(7);
+    captions.forEach((caption) => {
+      expect(caption.getAttribute('data-caption-size')).toBe('shared');
+      expect(caption.getAttribute('data-nowrap')).toBe('true');
+    });
   });
 
   it('renders at most three events per day in the week view and shows a +N indicator', () => {
@@ -165,7 +186,12 @@ describe('Calendar page', () => {
     const eventItems = within(eventsList).getAllByRole('listitem');
     const visibleTitles = eventItems.map((item) => item.textContent);
 
-    expect(visibleTitles).toEqual(['Событие 1', 'Событие 2', 'Событие 3', '+1']);
+    expect(visibleTitles).toEqual(['•Событие 1', '•Событие 2', '•Событие 3', '+1']);
+
+    const bulletItems = eventItems.slice(0, 3);
+    bulletItems.forEach((item) => {
+      expect(item.textContent?.startsWith('•')).toBe(true);
+    });
   });
 
   it('hides empty-state placeholders on days without events and highlights today with dedicated markers', () => {

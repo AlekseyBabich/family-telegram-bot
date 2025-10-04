@@ -237,6 +237,19 @@ const Calendar = () => {
     </>
   );
 
+  const WEEK_GRID_CLASSNAMES = useMemo(
+    () => [
+      'calendar-week-day--monday',
+      'calendar-week-day--tuesday',
+      'calendar-week-day--wednesday',
+      'calendar-week-day--thursday',
+      'calendar-week-day--friday',
+      'calendar-week-day--saturday',
+      'calendar-week-sunday calendar-week-day--sunday'
+    ],
+    []
+  );
+
   const renderWeekView = () => (
     <div className="calendar-week-grid" data-testid="calendar-week-grid">
       {weekDays.map((day, index) => {
@@ -255,7 +268,7 @@ const Calendar = () => {
             data-today={todayMatch ? 'true' : undefined}
             className={`calendar-week-day${selected ? ' calendar-day-selected' : ''}${
               todayMatch ? ' calendar-day-today' : ''
-            }${index === 6 ? ' calendar-week-sunday' : ''}`}
+            } ${WEEK_GRID_CLASSNAMES[index] ?? ''}`.trim()}
             aria-label={`Выбрать ${new Intl.DateTimeFormat('ru-RU', {
               weekday: 'long',
               day: 'numeric',
@@ -264,13 +277,20 @@ const Calendar = () => {
             }).format(day)}`}
             onClick={() => handleSelectDate(day)}
           >
-            <div className="calendar-week-day-header">
+            <div
+              className="calendar-week-day-caption"
+              data-caption-size="shared"
+              data-nowrap="true"
+            >
               {formatWeekdayLabel(day)}
             </div>
             <ul className="calendar-week-event-list">
               {visibleEvents.map((event) => (
                 <li key={event.id} className="calendar-week-event-item">
-                  {event.title}
+                  <span className="calendar-week-event-bullet" aria-hidden="true">
+                    •
+                  </span>
+                  <span className="calendar-week-event-text">{event.title}</span>
                 </li>
               ))}
               {remaining > 0 ? (
