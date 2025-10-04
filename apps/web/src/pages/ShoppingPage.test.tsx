@@ -72,6 +72,12 @@ describe('Shopping mobile swipe container', () => {
     expect(position).not.toBe('fixed');
   };
 
+  const extractButtonTitles = (container: HTMLElement) =>
+    within(container)
+      .getAllByRole('button')
+      .map((element) => element.textContent?.trim())
+      .filter((title): title is string => Boolean(title && title !== '+ добавить'));
+
   it('renders the first screen by default', async () => {
     renderShopping();
 
@@ -399,6 +405,60 @@ describe('Shopping mobile swipe container', () => {
 
     const secondList = getListForScreen(1);
     expect(within(secondList).queryByText('список пуст')).not.toBeInTheDocument();
+  });
+
+  it('separates checked items above unchecked ones and keeps alphabetical order inside sections', () => {
+    renderShopping();
+
+    const firstScreen = screen.getByTestId('shopping-screen-0');
+
+    fireEvent.click(within(firstScreen).getByRole('button', { name: 'Авокадо' }));
+    fireEvent.click(within(firstScreen).getByRole('button', { name: 'Рис жасмин' }));
+
+    const list = getListForScreen(0);
+
+    const selectedSection = within(list).getByTestId('shopping-section-selected');
+    const selectedTitles = extractButtonTitles(selectedSection);
+    const sortedSelected = [...selectedTitles].sort((a, b) =>
+      a.localeCompare(b, 'ru', { sensitivity: 'base' })
+    );
+    expect(selectedTitles).toEqual(sortedSelected);
+
+    const unselectedSection = within(list).getByTestId('shopping-section-unselected');
+    const unselectedTitles = extractButtonTitles(unselectedSection);
+    expect(unselectedTitles).not.toContain('Авокадо');
+    expect(unselectedTitles).not.toContain('Рис жасмин');
+    const sortedUnselected = [...unselectedTitles].sort((a, b) =>
+      a.localeCompare(b, 'ru', { sensitivity: 'base' })
+    );
+    expect(unselectedTitles).toEqual(sortedUnselected);
+  });
+
+  it('moves items between sections when toggled', async () => {
+    renderShopping();
+
+    const firstScreen = screen.getByTestId('shopping-screen-0');
+    const avocadoButton = within(firstScreen).getByRole('button', { name: 'Авокадо' });
+
+    fireEvent.click(avocadoButton);
+
+    const list = getListForScreen(0);
+
+    await waitFor(() =>
+      expect(within(list).getByTestId('shopping-section-selected')).toBeInTheDocument()
+    );
+
+    const selectedSection = within(list).getByTestId('shopping-section-selected');
+    expect(within(selectedSection).getByRole('button', { name: 'Авокадо' })).toBeInTheDocument();
+
+    fireEvent.click(within(selectedSection).getByRole('button', { name: 'Авокадо' }));
+
+    await waitFor(() =>
+      expect(within(list).queryByTestId('shopping-section-selected')).not.toBeInTheDocument()
+    );
+
+    const unselectedSection = within(list).getByTestId('shopping-section-unselected');
+    expect(within(unselectedSection).getByRole('button', { name: 'Авокадо' })).toBeInTheDocument();
   });
 
   it('keeps the add button trailing items when list content changes', async () => {
