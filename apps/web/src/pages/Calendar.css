@@ -6,12 +6,26 @@
   min-height: 100%;
 }
 
-.calendar-selected-date {
-  font-size: clamp(16px, 4vw, 18px);
-  font-weight: 500;
+.calendar-header-today {
+  font-size: clamp(18px, 4.5vw, 22px);
   text-align: center;
-  text-transform: capitalize;
-  color: var(--app-color-text-secondary);
+  color: var(--app-color-text-primary);
+}
+
+.calendar-header-today strong {
+  font-weight: 700;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .calendar-content {
@@ -98,8 +112,9 @@
 }
 
 .calendar-day-today {
-  background: rgba(34, 197, 94, 0.18);
+  background: rgba(34, 197, 94, 0.12);
   border-color: var(--app-color-primary);
+  border-width: 2px;
 }
 
 .calendar-week-grid {
@@ -128,8 +143,9 @@
 }
 
 .calendar-week-day.calendar-day-today {
-  background: rgba(34, 197, 94, 0.18);
+  background: rgba(34, 197, 94, 0.12);
   border-color: var(--app-color-primary);
+  border-width: 2px;
 }
 
 .calendar-week-sunday {
@@ -137,17 +153,12 @@
 }
 
 .calendar-week-day-header {
-  display: flex;
-  justify-content: flex-end;
-  align-items: baseline;
-  gap: 6px;
   font-weight: 600;
-  font-size: clamp(13px, 3.2vw, 15px);
-  text-transform: uppercase;
-}
-
-.calendar-week-day-number {
-  font-size: clamp(18px, 5vw, 22px);
+  font-size: clamp(14px, 3.8vw, 16px);
+  line-height: 1.2;
+  text-align: left;
+  text-transform: none;
+  word-break: break-word;
 }
 
 .calendar-week-event-list {
@@ -170,10 +181,6 @@
 .calendar-week-event-more {
   color: var(--app-color-primary);
   font-weight: 600;
-}
-
-.calendar-week-event-empty {
-  color: var(--app-color-text-muted);
 }
 
 .calendar-year-grid {

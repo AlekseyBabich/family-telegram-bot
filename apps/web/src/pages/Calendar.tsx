@@ -155,6 +155,24 @@ const Calendar = () => {
     [selectedDate]
   );
 
+  const weekdayLongFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat('ru-RU', {
+        weekday: 'long'
+      }),
+    []
+  );
+
+  const formatWeekdayLabel = useCallback(
+    (date: Date) => {
+      const weekday = weekdayLongFormatter.format(date);
+      const capitalizedWeekday =
+        weekday.charAt(0).toUpperCase() + weekday.slice(1);
+      return `${capitalizedWeekday}, ${date.getDate()}`;
+    },
+    [weekdayLongFormatter]
+  );
+
   const renderMonthView = () => (
     <>
       <div className="calendar-header">
@@ -197,6 +215,7 @@ const Calendar = () => {
               key={toDateKey(day)}
               type="button"
               data-testid={`calendar-day-${toDateKey(day)}`}
+              data-today={todayMatch ? 'true' : undefined}
               className={`calendar-month-day${
                 outsideCurrentMonth ? ' calendar-day-outside' : ''
               }${selected ? ' calendar-day-selected' : ''}${
@@ -233,6 +252,7 @@ const Calendar = () => {
             key={toDateKey(day)}
             type="button"
             data-testid={`week-day-${toDateKey(day)}`}
+            data-today={todayMatch ? 'true' : undefined}
             className={`calendar-week-day${selected ? ' calendar-day-selected' : ''}${
               todayMatch ? ' calendar-day-today' : ''
             }${index === 6 ? ' calendar-week-sunday' : ''}`}
@@ -245,8 +265,7 @@ const Calendar = () => {
             onClick={() => handleSelectDate(day)}
           >
             <div className="calendar-week-day-header">
-              <span className="calendar-week-day-label">{WEEKDAY_LABELS[index]}</span>
-              <span className="calendar-week-day-number">{day.getDate()}</span>
+              {formatWeekdayLabel(day)}
             </div>
             <ul className="calendar-week-event-list">
               {visibleEvents.map((event) => (
@@ -256,9 +275,6 @@ const Calendar = () => {
               ))}
               {remaining > 0 ? (
                 <li className="calendar-week-event-more">+{remaining}</li>
-              ) : null}
-              {visibleEvents.length === 0 && remaining <= 0 ? (
-                <li className="calendar-week-event-empty">Нет событий</li>
               ) : null}
             </ul>
           </button>
@@ -312,10 +328,12 @@ const Calendar = () => {
 
   return (
     <section className="calendar-page">
-      <h1 className="page-title">Календарь</h1>
-      <div className="calendar-selected-date" role="status" aria-live="polite">
-        {formatLongDate(selectedDate)}
+      <div className="calendar-header-today" data-testid="calendar-header-today">
+        <strong>{formatLongDate(today)}</strong>
       </div>
+      <span className="visually-hidden" role="status" aria-live="polite">
+        {formatLongDate(selectedDate)}
+      </span>
       <div className="calendar-content">
         {view === 'month' && renderMonthView()}
         {view === 'week' && renderWeekView()}

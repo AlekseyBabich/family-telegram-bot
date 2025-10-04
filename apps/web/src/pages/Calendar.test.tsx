@@ -89,6 +89,16 @@ describe('Calendar page', () => {
     expect(status).toHaveTextContent('21 мая 2024');
   });
 
+  it('renders the header with today\'s long-form date in bold and without the "Календарь" title', () => {
+    render(<Calendar />);
+
+    const todayHeading = screen.getByTestId('calendar-header-today');
+    expect(todayHeading).toHaveTextContent('15 мая 2024');
+    const boldElement = within(todayHeading).getByText('15 мая 2024');
+    expect(boldElement.tagName).toBe('STRONG');
+    expect(screen.queryByText('Календарь')).not.toBeInTheDocument();
+  });
+
   it('switches months and years using the header arrows and opens a month from the year view', () => {
     render(<Calendar />);
 
@@ -125,7 +135,7 @@ describe('Calendar page', () => {
     expect(monthButton).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('lays out the week view as 2x3 tiles with a wide Sunday tile on mobile width', () => {
+  it('lays out the week view as 2x3 tiles with full weekday labels and wide Sunday on mobile width', () => {
     setViewportWidth(390);
     render(<Calendar />);
 
@@ -138,6 +148,10 @@ describe('Calendar page', () => {
 
     const sundayTile = screen.getByTestId('week-day-2024-05-19');
     expect(sundayTile.className).toContain('calendar-week-sunday');
+
+    const mondayTile = screen.getByTestId('week-day-2024-05-13');
+    expect(mondayTile).toHaveTextContent('Понедельник, 13');
+    expect(sundayTile).toHaveTextContent('Воскресенье, 19');
   });
 
   it('renders at most three events per day in the week view and shows a +N indicator', () => {
@@ -152,5 +166,38 @@ describe('Calendar page', () => {
     const visibleTitles = eventItems.map((item) => item.textContent);
 
     expect(visibleTitles).toEqual(['Событие 1', 'Событие 2', 'Событие 3', '+1']);
+  });
+
+  it('hides empty-state placeholders on days without events and highlights today with dedicated markers', () => {
+    setViewportWidth(390);
+    render(<Calendar />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Перейти к неделе' }));
+
+    const todayTile = screen.getByTestId('week-day-2024-05-15');
+    expect(todayTile).toHaveClass('calendar-day-today');
+    expect(todayTile).toHaveAttribute('data-today', 'true');
+
+    const thursdayTile = screen.getByTestId('week-day-2024-05-16');
+    const thursdayEvents = within(thursdayTile).getByRole('list');
+    expect(within(thursdayEvents).queryByText(/нет событий/i)).not.toBeInTheDocument();
+  });
+
+  it('renders bottom navigation without console warnings', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    setViewportWidth(390);
+    render(<Calendar />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Перейти к неделе' }));
+
+    expect(screen.getByTestId('calendar-week-grid')).toBeInTheDocument();
+    expect(screen.getByTestId('calendar-bottom-nav')).toBeInTheDocument();
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 });
