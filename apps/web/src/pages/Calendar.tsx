@@ -1,4 +1,12 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  FormEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  useCallback,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import { CalendarEvent, generateMonthlyMockEvents } from './calendar/mockEvents';
 import './Calendar.css';
 
@@ -108,6 +116,42 @@ const useMonthEvents = () => {
   return { getEventsForDate };
 };
 
+const getEventTime = (event: CalendarEvent) => {
+  const match = event.dateISO.match(/T(\d{2}:\d{2})/);
+  return match ? match[1] : null;
+};
+
+const sortCalendarEvents = (events: CalendarEvent[]) => {
+  return [...events].sort((a, b) => {
+    const timeA = getEventTime(a);
+    const timeB = getEventTime(b);
+
+    if (timeA && timeB) {
+      return timeA.localeCompare(timeB, 'ru');
+    }
+
+    if (timeA && !timeB) {
+      return -1;
+    }
+
+    if (!timeA && timeB) {
+      return 1;
+    }
+
+    return a.title.localeCompare(b.title, 'ru');
+  });
+};
+
+const generateEventId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const getDateKeyFromISO = (isoString: string) => isoString.slice(0, 10);
+
 const Calendar = () => {
   const today = useMemo(() => getStartOfDay(new Date()), []);
   const [view, setView] = useState<CalendarView>('month');
@@ -116,6 +160,21 @@ const Calendar = () => {
     new Date(today.getFullYear(), today.getMonth(), 1)
   );
   const [yearCursor, setYearCursor] = useState<number>(today.getFullYear());
+  const [isDayModalOpen, setDayModalOpen] = useState(false);
+  const [customEventsByDate, setCustomEventsByDate] = useState<
+    Record<string, CalendarEvent[]>
+  >({});
+  const [removedEventIds, setRemovedEventIds] = useState<Set<string>>(new Set());
+  const [newEventTitle, setNewEventTitle] = useState('');
+  const [newEventTime, setNewEventTime] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<
+    | {
+        event: CalendarEvent;
+        position: { x: number; y: number };
+      }
+    | null
+  >(null);
 
   const { getEventsForDate } = useMonthEvents();
 
@@ -124,6 +183,21 @@ const Calendar = () => {
     setSelectedDate(normalized);
     setMonthCursor(new Date(normalized.getFullYear(), normalized.getMonth(), 1));
     setYearCursor(normalized.getFullYear());
+  }, []);
+
+  const handleOpenDayModal = useCallback(
+    (date: Date) => {
+      handleSelectDate(date);
+      setFormError(null);
+      setContextMenu(null);
+      setDayModalOpen(true);
+    },
+    [handleSelectDate]
+  );
+
+  const handleCloseDayModal = useCallback(() => {
+    setDayModalOpen(false);
+    setContextMenu(null);
   }, []);
 
   const handleChangeMonth = (amount: number) => {
@@ -172,6 +246,151 @@ const Calendar = () => {
     },
     [weekdayLongFormatter]
   );
+
+  const getAugmentedEventsForDate = useCallback(
+    (date: Date) => {
+      const dateKey = toDateKey(date);
+      const baseEvents = getEventsForDate(date).filter(
+        (event) => !removedEventIds.has(event.id)
+      );
+      const customEvents = customEventsByDate[dateKey] ?? [];
+
+      return [...baseEvents, ...customEvents];
+    },
+    [customEventsByDate, getEventsForDate, removedEventIds]
+  );
+
+  const dayEvents = useMemo(
+    () => sortCalendarEvents(getAugmentedEventsForDate(selectedDate)),
+    [getAugmentedEventsForDate, selectedDate]
+  );
+
+  const formatDayDialogHeading = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat('ru-RU', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long'
+    });
+
+    return (date: Date) => {
+      const formatted = formatter.format(date);
+      return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    };
+  }, []);
+
+  const handleAddEvent = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+
+      const trimmedTitle = newEventTitle.trim();
+      if (!trimmedTitle) {
+        setFormError('Описание обязательно');
+        return;
+      }
+
+      const dateKey = toDateKey(selectedDate);
+      const time = newEventTime;
+      const timeSegment = time ? `T${time}:00` : '';
+      const newEvent: CalendarEvent = {
+        id: generateEventId(),
+        dateISO: `${dateKey}${timeSegment}`,
+        title: trimmedTitle
+      };
+
+      setCustomEventsByDate((current) => {
+        const eventsForDate = current[dateKey] ?? [];
+        return {
+          ...current,
+          [dateKey]: [...eventsForDate, newEvent]
+        };
+      });
+      setNewEventTitle('');
+      setNewEventTime('');
+      setFormError(null);
+    },
+    [newEventTime, newEventTitle, selectedDate]
+  );
+
+  const handleDeleteEvent = useCallback(
+    (eventToDelete: CalendarEvent) => {
+      const dateKey = getDateKeyFromISO(eventToDelete.dateISO);
+      const customEvents = customEventsByDate[dateKey] ?? [];
+
+      if (customEvents.some((item) => item.id === eventToDelete.id)) {
+        setCustomEventsByDate((current) => {
+          const existing = current[dateKey] ?? [];
+          const remaining = existing.filter(
+            (item) => item.id !== eventToDelete.id
+          );
+
+          if (remaining.length === 0) {
+            const { [dateKey]: _removed, ...rest } = current;
+            return rest;
+          }
+
+          return {
+            ...current,
+            [dateKey]: remaining
+          };
+        });
+      } else {
+        setRemovedEventIds((current) => {
+          const next = new Set(current);
+          next.add(eventToDelete.id);
+          return next;
+        });
+      }
+
+      setContextMenu(null);
+    },
+    [customEventsByDate]
+  );
+
+  const handleEventClick = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>, calendarEvent: CalendarEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const nativeEvent = event.nativeEvent as MouseEvent;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const x = nativeEvent.clientX || rect.left + rect.width / 2;
+      const y = nativeEvent.clientY || rect.top + rect.height / 2;
+
+      setContextMenu({
+        event: calendarEvent,
+        position: { x, y }
+      });
+    },
+    []
+  );
+
+  const handleTimeFieldFocus = useCallback((element: HTMLInputElement | null) => {
+    element?.showPicker?.();
+  }, []);
+
+  const handleTimeKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLInputElement>) => {
+      const allowedKeys = [
+        'Tab',
+        'ArrowLeft',
+        'ArrowRight',
+        'ArrowUp',
+        'ArrowDown',
+        'Backspace',
+        'Delete',
+        'Home',
+        'End'
+      ];
+
+      if (!allowedKeys.includes(event.key)) {
+        event.preventDefault();
+      }
+    },
+    []
+  );
+
+  const hasEvents = dayEvents.length > 0;
+  const dialogTitleId = 'calendar-day-dialog-title';
 
   const renderMonthView = () => (
     <>
@@ -227,7 +446,7 @@ const Calendar = () => {
                 month: 'long',
                 year: 'numeric'
               }).format(day)}`}
-              onClick={() => handleSelectDate(day)}
+              onClick={() => handleOpenDayModal(day)}
             >
               <span>{day.getDate()}</span>
             </button>
@@ -253,7 +472,7 @@ const Calendar = () => {
   const renderWeekView = () => (
     <div className="calendar-week-grid" data-testid="calendar-week-grid">
       {weekDays.map((day, index) => {
-        const events = getEventsForDate(day);
+        const events = sortCalendarEvents(getAugmentedEventsForDate(day));
         const maxVisible = 3;
         const visibleEvents = events.slice(0, maxVisible);
         const remaining = events.length - visibleEvents.length;
@@ -275,7 +494,7 @@ const Calendar = () => {
               month: 'long',
               year: 'numeric'
             }).format(day)}`}
-            onClick={() => handleSelectDate(day)}
+            onClick={() => handleOpenDayModal(day)}
           >
             <div
               className="calendar-week-day-caption"
@@ -285,12 +504,12 @@ const Calendar = () => {
               {formatWeekdayLabel(day)}
             </div>
             <ul className="calendar-week-event-list">
-              {visibleEvents.map((event) => (
-                <li key={event.id} className="calendar-week-event-item">
+              {visibleEvents.map((eventItem) => (
+                <li key={eventItem.id} className="calendar-week-event-item">
                   <span className="calendar-week-event-bullet" aria-hidden="true">
                     •
                   </span>
-                  <span className="calendar-week-event-text">{event.title}</span>
+                  <span className="calendar-week-event-text">{eventItem.title}</span>
                 </li>
               ))}
               {remaining > 0 ? (
@@ -346,6 +565,25 @@ const Calendar = () => {
     </>
   );
 
+  const menuPosition = (() => {
+    if (!contextMenu) {
+      return null;
+    }
+
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 0;
+    const maxLeft = viewportWidth ? Math.max(viewportWidth - 160, 16) : contextMenu.position.x;
+    const safeLeft = viewportWidth
+      ? Math.min(Math.max(contextMenu.position.x, 16), maxLeft)
+      : contextMenu.position.x;
+    const maxTop = viewportHeight ? Math.max(viewportHeight - 80, 16) : contextMenu.position.y - 20;
+    const safeTop = viewportHeight
+      ? Math.min(Math.max(contextMenu.position.y - 20, 16), maxTop)
+      : contextMenu.position.y - 20;
+
+    return { top: safeTop, left: safeLeft };
+  })();
+
   return (
     <section className="calendar-page">
       <div className="calendar-header-today" data-testid="calendar-header-today">
@@ -398,6 +636,132 @@ const Calendar = () => {
           Год
         </button>
       </nav>
+      {isDayModalOpen ? (
+        <div
+          className="calendar-day-dialog-backdrop"
+          data-testid="calendar-day-dialog-backdrop"
+        >
+          <div
+            className="calendar-day-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={dialogTitleId}
+            onMouseDownCapture={() => setContextMenu(null)}
+          >
+            <header className="calendar-day-dialog-header">
+              <h2 id={dialogTitleId}>{formatDayDialogHeading(selectedDate)}</h2>
+            </header>
+            <div className="calendar-day-dialog-body">
+              <ul className="calendar-day-dialog-events" data-testid="calendar-day-event-list">
+                {hasEvents ? (
+                  dayEvents.map((eventItem) => {
+                    const time = getEventTime(eventItem);
+
+                    return (
+                      <li key={eventItem.id} className="calendar-day-event-item">
+                        <button
+                          type="button"
+                          className="calendar-day-event-button"
+                          onClick={(clickEvent) =>
+                            handleEventClick(clickEvent, eventItem)
+                          }
+                          aria-haspopup="menu"
+                          aria-expanded={
+                            contextMenu?.event.id === eventItem.id ? 'true' : undefined
+                          }
+                          data-testid="calendar-day-event"
+                        >
+                          <span
+                            className="calendar-day-event-bullet"
+                            aria-hidden="true"
+                          >
+                            •
+                          </span>
+                          <span className="calendar-day-event-title">
+                            {eventItem.title}
+                          </span>
+                          <span className="calendar-day-event-time">
+                            {time ?? ''}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })
+                ) : (
+                  <li className="calendar-day-event-empty">Событий нет</li>
+                )}
+              </ul>
+              <form className="calendar-day-dialog-form" onSubmit={handleAddEvent}>
+                <div className="calendar-day-form-field">
+                  <label htmlFor="calendar-day-description">Описание</label>
+                  <input
+                    id="calendar-day-description"
+                    name="description"
+                    type="text"
+                    required
+                    value={newEventTitle}
+                    onChange={(event) => {
+                      setNewEventTitle(event.target.value);
+                      if (formError) {
+                        setFormError(null);
+                      }
+                    }}
+                    placeholder="Введите описание"
+                  />
+                </div>
+                <div className="calendar-day-form-field">
+                  <label htmlFor="calendar-day-time">Время</label>
+                  <input
+                    id="calendar-day-time"
+                    name="time"
+                    type="time"
+                    step={1800}
+                    inputMode="none"
+                    value={newEventTime}
+                    onChange={(event) => setNewEventTime(event.target.value)}
+                    onFocus={(event) => handleTimeFieldFocus(event.target)}
+                    onKeyDown={handleTimeKeyDown}
+                    placeholder="--:--"
+                  />
+                </div>
+                {formError ? (
+                  <div className="calendar-day-dialog-error" role="alert">
+                    {formError}
+                  </div>
+                ) : null}
+                <button type="submit" className="calendar-day-dialog-submit">
+                  Добавить
+                </button>
+              </form>
+            </div>
+            <div className="calendar-day-dialog-footer">
+              <button
+                type="button"
+                className="calendar-day-dialog-back"
+                onClick={handleCloseDayModal}
+              >
+                Назад
+              </button>
+            </div>
+          </div>
+          {contextMenu && menuPosition ? (
+            <div
+              className="calendar-day-context-menu"
+              role="menu"
+              aria-label="Действия с событием"
+              style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleDeleteEvent(contextMenu.event)}
+              >
+                Удалить
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 };

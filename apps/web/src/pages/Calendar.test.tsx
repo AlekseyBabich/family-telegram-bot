@@ -226,4 +226,143 @@ describe('Calendar page', () => {
     warnSpy.mockRestore();
     errorSpy.mockRestore();
   });
+
+  it('opens the day modal from month and week views with localized heading', () => {
+    render(<Calendar />);
+
+    fireEvent.click(screen.getByTestId('calendar-day-2024-05-15'));
+
+    let dialog = screen.getByRole('dialog');
+    let heading = within(dialog).getByRole('heading', { level: 2 });
+    expect(heading.textContent).toMatch(/^[А-ЯЁ][а-яё]+, \d+ [а-яё]+$/);
+    expect(heading.textContent).toContain('мая');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Назад' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Перейти к неделе' }));
+    fireEvent.click(screen.getByTestId('week-day-2024-05-14'));
+
+    dialog = screen.getByRole('dialog');
+    heading = within(dialog).getByRole('heading', { level: 2 });
+    expect(heading.textContent).toMatch(/^[А-ЯЁ][а-яё]+, \d+ [а-яё]+$/);
+    expect(heading.textContent).toContain('мая');
+  });
+
+  it('adds events with 30-minute time picker and sorts items placing untimed last', () => {
+    render(<Calendar />);
+
+    fireEvent.click(screen.getByTestId('calendar-day-2024-05-15'));
+
+    const dialog = screen.getByRole('dialog');
+    const descriptionInput = within(dialog).getByLabelText('Описание');
+    const timeInput = within(dialog).getByLabelText('Время');
+    expect(timeInput).toHaveAttribute('step', '1800');
+    expect(timeInput).toHaveAttribute('inputmode', 'none');
+
+    fireEvent.change(descriptionInput, {
+      target: { value: 'Прогулка в парке' }
+    });
+    fireEvent.change(timeInput, { target: { value: '10:30' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить' }));
+
+    fireEvent.change(descriptionInput, {
+      target: { value: 'Очень длинное событие без времени для проверки переноса' }
+    });
+    fireEvent.change(timeInput, { target: { value: '' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить' }));
+
+    const eventButtons = within(dialog).getAllByTestId('calendar-day-event');
+    const eventTexts = eventButtons.map((button) =>
+      button.textContent?.replace(/\s+/g, ' ').trim() ?? ''
+    );
+
+    const secondIndex = eventTexts.findIndex((text) => text.includes('Событие 2'));
+    const thirdIndex = eventTexts.findIndex((text) => text.includes('Событие 3'));
+    const walkIndex = eventTexts.findIndex((text) => text.includes('Прогулка в парке'));
+    expect(secondIndex).toBeGreaterThanOrEqual(0);
+    expect(thirdIndex).toBeGreaterThanOrEqual(0);
+    expect(walkIndex).toBeGreaterThan(secondIndex);
+    expect(walkIndex).toBeLessThan(thirdIndex);
+
+    const lastButton = eventButtons[eventButtons.length - 1];
+    expect(lastButton.textContent).toContain(
+      'Очень длинное событие без времени для проверки переноса'
+    );
+    const lastTime =
+      lastButton.querySelector('.calendar-day-event-time')?.textContent ?? '';
+    expect(lastTime.trim()).toBe('');
+  });
+
+  it('renders bullet events without checkboxes and preserves long text', () => {
+    render(<Calendar />);
+
+    fireEvent.click(screen.getByTestId('calendar-day-2024-05-15'));
+
+    const dialog = screen.getByRole('dialog');
+    const descriptionInput = within(dialog).getByLabelText('Описание');
+    const timeInput = within(dialog).getByLabelText('Время');
+
+    fireEvent.change(descriptionInput, {
+      target: { value: 'Очень длинное описание события для проверки переноса текста' }
+    });
+    fireEvent.change(timeInput, { target: { value: '16:30' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить' }));
+
+    const addedButton = within(dialog)
+      .getAllByTestId('calendar-day-event')
+      .find((button) =>
+        button.textContent?.includes(
+          'Очень длинное описание события для проверки переноса текста'
+        )
+      );
+
+    expect(addedButton).toBeDefined();
+    expect(addedButton?.textContent?.trim().startsWith('•')).toBe(true);
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(addedButton?.textContent).toContain(
+      'Очень длинное описание события для проверки переноса текста'
+    );
+  });
+
+  it('removes an event via the context menu delete action', () => {
+    render(<Calendar />);
+
+    fireEvent.click(screen.getByTestId('calendar-day-2024-05-15'));
+
+    const dialog = screen.getByRole('dialog');
+    const targetButton = within(dialog)
+      .getAllByTestId('calendar-day-event')
+      .find((button) => button.textContent?.includes('Событие 2'));
+
+    expect(targetButton).toBeDefined();
+    if (!targetButton) {
+      throw new Error('Target event not found');
+    }
+
+    fireEvent.click(targetButton);
+    const deleteAction = screen.getByRole('menuitem', { name: 'Удалить' });
+    fireEvent.click(deleteAction);
+
+    const remainingTexts = within(dialog)
+      .getAllByTestId('calendar-day-event')
+      .map((button) => button.textContent ?? '');
+    expect(remainingTexts.some((text) => text.includes('Событие 2'))).toBe(false);
+  });
+
+  it('closes only via the back button without reacting to backdrop or Esc', () => {
+    render(<Calendar />);
+
+    fireEvent.click(screen.getByTestId('calendar-day-2024-05-15'));
+
+    const dialog = screen.getByRole('dialog');
+    fireEvent.mouseDown(screen.getByTestId('calendar-day-dialog-backdrop'));
+    fireEvent.mouseUp(screen.getByTestId('calendar-day-dialog-backdrop'));
+    expect(screen.getByRole('dialog')).toBe(dialog);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByRole('dialog')).toBe(dialog);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Назад' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 });
