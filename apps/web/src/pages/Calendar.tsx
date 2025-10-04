@@ -650,6 +650,7 @@ const Calendar = () => {
           >
             <header className="calendar-day-dialog-header">
               <h2 id={dialogTitleId}>{formatDayDialogHeading(selectedDate)}</h2>
+              <p className="calendar-day-dialog-subheading">Список дел</p>
             </header>
             <div className="calendar-day-dialog-body">
               <ul className="calendar-day-dialog-events" data-testid="calendar-day-event-list">
@@ -680,7 +681,10 @@ const Calendar = () => {
                           <span className="calendar-day-event-title">
                             {eventItem.title}
                           </span>
-                          <span className="calendar-day-event-time">
+                          <span
+                            className="calendar-day-event-time"
+                            data-nowrap="true"
+                          >
                             {time ?? ''}
                           </span>
                         </button>
@@ -709,7 +713,10 @@ const Calendar = () => {
                     placeholder="Введите описание"
                   />
                 </div>
-                <div className="calendar-day-form-field">
+                <div
+                  className="calendar-day-form-field calendar-day-time-field"
+                  data-testid="calendar-day-time-field"
+                >
                   <label htmlFor="calendar-day-time">Время</label>
                   <input
                     id="calendar-day-time"
@@ -729,19 +736,27 @@ const Calendar = () => {
                     {formError}
                   </div>
                 ) : null}
-                <button type="submit" className="calendar-day-dialog-submit">
-                  Добавить
-                </button>
+                <div
+                  className="calendar-day-dialog-actions"
+                  data-testid="calendar-day-dialog-actions"
+                >
+                  <button
+                    type="submit"
+                    className="calendar-day-dialog-action-button calendar-day-dialog-action-button--primary"
+                    data-testid="calendar-day-dialog-action"
+                  >
+                    + добавить
+                  </button>
+                  <button
+                    type="button"
+                    className="calendar-day-dialog-action-button calendar-day-dialog-action-button--secondary"
+                    onClick={handleCloseDayModal}
+                    data-testid="calendar-day-dialog-action"
+                  >
+                    Назад
+                  </button>
+                </div>
               </form>
-            </div>
-            <div className="calendar-day-dialog-footer">
-              <button
-                type="button"
-                className="calendar-day-dialog-back"
-                onClick={handleCloseDayModal}
-              >
-                Назад
-              </button>
             </div>
           </div>
           {contextMenu && menuPosition ? (

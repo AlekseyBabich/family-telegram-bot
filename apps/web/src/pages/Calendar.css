@@ -297,6 +297,9 @@
 
 .calendar-day-dialog-header {
   padding: 20px 24px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .calendar-day-dialog-header h2 {
@@ -304,6 +307,13 @@
   font-size: clamp(18px, 4.5vw, 22px);
   font-weight: 700;
   text-transform: capitalize;
+}
+
+.calendar-day-dialog-subheading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--app-color-text-secondary);
 }
 
 .calendar-day-dialog-body {
@@ -328,8 +338,9 @@
 }
 
 .calendar-day-event-button {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
   gap: 12px;
   width: 100%;
   border: none;
@@ -351,24 +362,24 @@
   font-size: 18px;
   line-height: 1;
   margin-top: 2px;
+  align-self: flex-start;
 }
 
 .calendar-day-event-title {
-  flex: 1;
   font-size: 15px;
   line-height: 1.4;
   word-break: break-word;
+  min-width: 0;
 }
 
 .calendar-day-event-time {
-  flex: 0 0 auto;
-  margin-left: auto;
   font-weight: 600;
   font-size: 14px;
   color: var(--app-color-text-secondary);
   min-width: 52px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .calendar-day-event-empty {
@@ -416,32 +427,44 @@
   font-size: 14px;
 }
 
-.calendar-day-dialog-submit {
-  align-self: flex-start;
-  border-radius: 20px;
+.calendar-day-time-field,
+.calendar-day-dialog-actions {
+  width: min(260px, 100%);
+  margin: 0 auto;
+}
+
+.calendar-day-dialog-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.calendar-day-dialog-action-button {
+  width: 100%;
+  border-radius: 18px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
   border: none;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.calendar-day-dialog-action-button--primary {
   background: var(--app-color-primary);
   color: var(--app-color-primary-contrast);
-  font-weight: 600;
-  padding: 10px 20px;
-  cursor: pointer;
 }
 
-.calendar-day-dialog-footer {
-  margin-top: auto;
-  padding: 16px 24px 20px;
-  border-top: 1px solid var(--app-color-divider);
-  display: flex;
-  justify-content: flex-end;
-}
-
-.calendar-day-dialog-back {
-  border-radius: 18px;
-  border: 1px solid var(--app-color-divider);
+.calendar-day-dialog-action-button--secondary {
   background: var(--app-color-surface-subtle);
-  padding: 10px 20px;
-  font-weight: 600;
-  cursor: pointer;
+  color: var(--app-color-text-primary);
+  border: 1px solid var(--app-color-divider);
+}
+
+.calendar-day-dialog-action-button:focus-visible {
+  outline: 2px solid var(--app-color-primary);
+  outline-offset: 2px;
 }
 
 .calendar-day-context-menu {
@@ -469,12 +492,6 @@
 .calendar-day-context-menu button:focus-visible {
   background: var(--app-color-surface-subtle);
   outline: none;
-}
-
-.calendar-day-dialog-back:focus-visible,
-.calendar-day-dialog-submit:focus-visible {
-  outline: 2px solid var(--app-color-primary);
-  outline-offset: 2px;
 }
 
 @media (min-width: 768px) {
