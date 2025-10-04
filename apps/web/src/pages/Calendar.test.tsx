@@ -236,6 +236,9 @@ describe('Calendar page', () => {
     let heading = within(dialog).getByRole('heading', { level: 2 });
     expect(heading.textContent).toMatch(/^[А-ЯЁ][а-яё]+, \d+ [а-яё]+$/);
     expect(heading.textContent).toContain('мая');
+    const subheading = within(dialog).getByText('Список дел');
+    expect(subheading).toBeInTheDocument();
+    expect(subheading.parentElement).toHaveClass('calendar-day-dialog-header');
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Назад' }));
 
@@ -246,6 +249,35 @@ describe('Calendar page', () => {
     heading = within(dialog).getByRole('heading', { level: 2 });
     expect(heading.textContent).toMatch(/^[А-ЯЁ][а-яё]+, \d+ [а-яё]+$/);
     expect(heading.textContent).toContain('мая');
+  });
+
+  it('centers actions, time input, and aligns event times inside the day modal', () => {
+    render(<Calendar />);
+
+    fireEvent.click(screen.getByTestId('calendar-day-2024-05-15'));
+
+    const dialog = screen.getByRole('dialog');
+    const actionsWrapper = within(dialog).getByTestId('calendar-day-dialog-actions');
+    expect(actionsWrapper.className).toBe('calendar-day-dialog-actions');
+
+    const actionButtons = within(actionsWrapper).getAllByTestId('calendar-day-dialog-action');
+    expect(actionButtons).toHaveLength(2);
+    actionButtons.forEach((button) => {
+      expect(button.className).toContain('calendar-day-dialog-action-button');
+    });
+    expect(actionButtons[0]).toHaveTextContent('+ добавить');
+    expect(actionButtons[0]).toHaveAttribute('type', 'submit');
+    expect(actionButtons[1]).toHaveTextContent('Назад');
+    expect(actionButtons[1]).toHaveAttribute('type', 'button');
+
+    const timeField = within(dialog).getByTestId('calendar-day-time-field');
+    expect(timeField.className).toBe('calendar-day-form-field calendar-day-time-field');
+
+    const [firstEvent] = within(dialog).getAllByTestId('calendar-day-event');
+    expect(firstEvent.className).toContain('calendar-day-event-button');
+    const eventTime = within(firstEvent).getByText(/\d{2}:\d{2}/);
+    expect(eventTime.className).toBe('calendar-day-event-time');
+    expect(eventTime).toHaveAttribute('data-nowrap', 'true');
   });
 
   it('adds events with 30-minute time picker and sorts items placing untimed last', () => {
@@ -263,13 +295,13 @@ describe('Calendar page', () => {
       target: { value: 'Прогулка в парке' }
     });
     fireEvent.change(timeInput, { target: { value: '10:30' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '+ добавить' }));
 
     fireEvent.change(descriptionInput, {
       target: { value: 'Очень длинное событие без времени для проверки переноса' }
     });
     fireEvent.change(timeInput, { target: { value: '' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '+ добавить' }));
 
     const eventButtons = within(dialog).getAllByTestId('calendar-day-event');
     const eventTexts = eventButtons.map((button) =>
@@ -306,7 +338,7 @@ describe('Calendar page', () => {
       target: { value: 'Очень длинное описание события для проверки переноса текста' }
     });
     fireEvent.change(timeInput, { target: { value: '16:30' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '+ добавить' }));
 
     const addedButton = within(dialog)
       .getAllByTestId('calendar-day-event')
