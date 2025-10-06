@@ -17,6 +17,8 @@ type AddItemFormProps = {
   onSubmit: () => void;
   onCancel: () => void;
   autoFocusTitle?: boolean;
+  submitting?: boolean;
+  errorMessage?: string;
 };
 
 export const AddItemForm = ({
@@ -26,9 +28,14 @@ export const AddItemForm = ({
   onTitleChange,
   onSubmit,
   onCancel,
-  autoFocusTitle = false
+  autoFocusTitle = false,
+  submitting = false,
+  errorMessage
 }: AddItemFormProps) => {
-  const isSubmitDisabled = useMemo(() => state.title.trim().length === 0, [state.title]);
+  const isSubmitDisabled = useMemo(
+    () => submitting || state.title.trim().length === 0,
+    [state.title, submitting]
+  );
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -65,8 +72,18 @@ export const AddItemForm = ({
           required
         />
       </div>
+      {errorMessage ? (
+        <p className={styles.error} role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
       <div className={styles.actions}>
-        <Button type="submit" variant="primary" disabled={isSubmitDisabled}>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={isSubmitDisabled}
+          aria-busy={submitting ? 'true' : undefined}
+        >
           Добавить
         </Button>
         <Button type="button" variant="secondary" onClick={onCancel}>
