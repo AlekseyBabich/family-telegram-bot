@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import styles from './shopping/ShoppingLayout.module.css';
 import {
-  createInitialShoppingLists,
-  sortItems,
+  SHOPPING_LISTS,
   type CheckItem,
   type ShoppingListData
 } from './shoppingData';
@@ -13,30 +12,17 @@ import { Dialog } from './shopping/components/Dialog';
 import { AddItemForm, type AddItemFormState } from './shopping/components/AddItemForm';
 import { RenameItemForm } from './shopping/components/RenameItemForm';
 import { ContextMenu } from './shopping/components/ContextMenu';
-
-const createItemId = (listTitle: string) => {
-  const normalized = listTitle
-    .toLowerCase()
-    .replace(/[^a-zа-я0-9]+/gi, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-+/g, '-');
-
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return `${normalized}-${crypto.randomUUID()}`;
-  }
-
-  return `${normalized}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-};
+import { useShoppingLists } from './shopping/hooks/useShoppingLists';
 
 type ContextMenuState = {
-  listIndex: number;
+  listSlug: ShoppingListData['slug'];
   itemId: string;
   title: string;
   anchor: { x: number; y: number };
 };
 
 type RenameState = {
-  listIndex: number;
+  listSlug: ShoppingListData['slug'];
   itemId: string;
   value: string;
 };
@@ -59,17 +45,8 @@ const clampPosition = (position: { x: number; y: number }) => {
 };
 
 const Shopping = () => {
-  const initialListsRef = useRef<ShoppingListData[] | null>(null);
-  if (initialListsRef.current === null) {
-    initialListsRef.current = createInitialShoppingLists();
-  }
-
-  const [lists, setLists] = useState<ShoppingListData[]>(
-    () => initialListsRef.current as ShoppingListData[]
-  );
-  const [activeListId, setActiveListId] = useState<string>(
-    () => initialListsRef.current?.[0]?.title ?? ''
-  );
+  const { lists, addItem, toggleChecked, renameItem, removeItem } = useShoppingLists();
+  const [activeListId, setActiveListId] = useState<string>(() => SHOPPING_LISTS[0]?.title ?? '');
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -149,27 +126,17 @@ const Shopping = () => {
     selectListByIndex(currentIndex - 1);
   }, [currentIndex, selectListByIndex]);
 
-  const handleToggleItem = useCallback((listIndex: number, itemId: string) => {
-    setLists((prevLists) =>
-      prevLists.map((list, index) => {
-        if (index !== listIndex) {
-          return list;
-        }
+  const handleToggleItem = useCallback(
+    (list: ShoppingListData, itemId: string) => {
+      const target = list.items.find((entry) => entry.id === itemId);
+      if (!target) {
+        return;
+      }
 
-        return {
-          ...list,
-          items: list.items.map((item) =>
-            item.id === itemId
-              ? {
-                  ...item,
-                  done: !item.done
-                }
-              : item
-          )
-        };
-      })
-    );
-  }, []);
+      void toggleChecked(list.slug, target);
+    },
+    [toggleChecked]
+  );
 
   const openAddDialog = useCallback(
     (categoryTitle: string) => {
@@ -189,9 +156,9 @@ const Shopping = () => {
     setAddFormState((prev) => ({ ...prev, title: '' }));
   }, []);
 
-  const openContextMenu = useCallback((listIndex: number, item: CheckItem, position: { x: number; y: number }) => {
+  const openContextMenu = useCallback((list: ShoppingListData, item: CheckItem, position: { x: number; y: number }) => {
     setContextMenuState({
-      listIndex,
+      listSlug: list.slug,
       itemId: item.id,
       title: item.title,
       anchor: clampPosition(position)
@@ -221,74 +188,34 @@ const Shopping = () => {
         return null;
       }
 
-      setLists((prevLists) =>
-        prevLists.map((list, index) => {
-          if (index !== current.listIndex) {
-            return list;
-          }
-
-          return {
-            ...list,
-            items: sortItems(
-              list.items.map((item) =>
-                item.id === current.itemId
-                  ? {
-                      ...item,
-                      title: trimmedValue
-                    }
-                  : item
-              )
-            )
-          };
-        })
-      );
-
+      void renameItem(current.listSlug, current.itemId, trimmedValue);
       return null;
     });
-  }, []);
+  }, [renameItem]);
 
-  const deleteItem = useCallback((listIndex: number, itemId: string) => {
-    setLists((prevLists) =>
-      prevLists.map((list, index) => {
-        if (index !== listIndex) {
-          return list;
-        }
+  const deleteItem = useCallback(
+    (listSlug: ShoppingListData['slug'], itemId: string) => {
+      void removeItem(listSlug, itemId);
+    },
+    [removeItem]
+  );
 
-        return {
-          ...list,
-          items: sortItems(list.items.filter((item) => item.id !== itemId))
-        };
-      })
-    );
-  }, []);
-
-  const addItem = useCallback(() => {
+  const submitNewItem = useCallback(() => {
     const trimmed = addFormState.title.trim();
     if (!addFormState.category || !trimmed) {
       return;
     }
 
-    const newItem: CheckItem = {
-      id: createItemId(addFormState.category),
-      title: trimmed,
-      done: false
-    };
+    const targetList = lists.find((entry) => entry.title === addFormState.category);
+    if (!targetList) {
+      return;
+    }
 
-    setLists((prevLists) =>
-      prevLists.map((list, index) => {
-        if (list.title !== addFormState.category) {
-          return list;
-        }
-
-        return {
-          ...list,
-          items: sortItems([...list.items, newItem])
-        };
-      })
-    );
-
-    closeAddDialog();
-  }, [addFormState, closeAddDialog]);
+    void (async () => {
+      await addItem(targetList.slug, trimmed);
+      closeAddDialog();
+    })();
+  }, [addFormState, addItem, closeAddDialog, lists]);
 
   const categoryOptions = useMemo(() => lists.map((list) => list.title), [lists]);
 
@@ -382,14 +309,14 @@ const Shopping = () => {
       </header>
       {isDesktop ? (
         <div className={styles.desktopGrid} aria-label="Списки покупок">
-          {lists.map((list, index) => (
+          {lists.map((list) => (
             <Checklist
               key={list.title}
               title={list.title}
               items={list.items}
-              onToggle={(itemId) => handleToggleItem(index, itemId)}
+              onToggle={(itemId) => handleToggleItem(list, itemId)}
               onAdd={() => openAddDialog(list.title)}
-              onOpenActions={(item, position) => openContextMenu(index, item, position)}
+              onOpenActions={(item, position) => openContextMenu(list, item, position)}
             />
           ))}
         </div>
@@ -418,9 +345,9 @@ const Shopping = () => {
                       title={list.title}
                       items={list.items}
                       showTitle={false}
-                      onToggle={(itemId) => handleToggleItem(index, itemId)}
+                      onToggle={(itemId) => handleToggleItem(list, itemId)}
                       onAdd={() => openAddDialog(list.title)}
-                      onOpenActions={(item, position) => openContextMenu(index, item, position)}
+                      onOpenActions={(item, position) => openContextMenu(list, item, position)}
                     />
                   </div>
                 </div>
@@ -453,7 +380,7 @@ const Shopping = () => {
           categoryOptions={categoryOptions}
           onCategoryChange={(value) => setAddFormState((prev) => ({ ...prev, category: value }))}
           onTitleChange={(value) => setAddFormState((prev) => ({ ...prev, title: value }))}
-          onSubmit={addItem}
+          onSubmit={submitNewItem}
           onCancel={closeAddDialog}
           autoFocusTitle={isDesktop}
         />
@@ -485,7 +412,7 @@ const Shopping = () => {
             return;
           }
           startRename({
-            listIndex: activeContext.listIndex,
+            listSlug: activeContext.listSlug,
             itemId: activeContext.itemId,
             value: activeContext.title
           });
@@ -494,7 +421,7 @@ const Shopping = () => {
           if (!activeContext) {
             return;
           }
-          deleteItem(activeContext.listIndex, activeContext.itemId);
+          deleteItem(activeContext.listSlug, activeContext.itemId);
         }}
       />
     </section>

@@ -19,9 +19,9 @@ describe('App routes', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders calendar page title', () => {
+  it('renders calendar page content', () => {
     renderWithRoute('/calendar');
-    expect(screen.getByRole('heading', { level: 1, name: 'Календарь' })).toBeInTheDocument();
+    expect(screen.getByTestId('calendar-bottom-nav')).toBeInTheDocument();
   });
 
   it('renders budget page title', () => {
