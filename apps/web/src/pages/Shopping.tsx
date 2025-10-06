@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import styles from './shopping/ShoppingLayout.module.css';
 import {
-  createInitialShoppingLists,
-  sortItems,
+  SHOPPING_LISTS,
   type CheckItem,
   type ShoppingListData
 } from './shoppingData';
@@ -13,30 +12,17 @@ import { Dialog } from './shopping/components/Dialog';
 import { AddItemForm, type AddItemFormState } from './shopping/components/AddItemForm';
 import { RenameItemForm } from './shopping/components/RenameItemForm';
 import { ContextMenu } from './shopping/components/ContextMenu';
-
-const createItemId = (listTitle: string) => {
-  const normalized = listTitle
-    .toLowerCase()
-    .replace(/[^a-zа-я0-9]+/gi, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-+/g, '-');
-
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return `${normalized}-${crypto.randomUUID()}`;
-  }
-
-  return `${normalized}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-};
+import { useShoppingLists } from './shopping/hooks/useShoppingLists';
 
 type ContextMenuState = {
-  listIndex: number;
+  listSlug: ShoppingListData['slug'];
   itemId: string;
   title: string;
   anchor: { x: number; y: number };
 };
 
 type RenameState = {
-  listIndex: number;
+  listSlug: ShoppingListData['slug'];
   itemId: string;
   value: string;
 };
@@ -59,17 +45,9 @@ const clampPosition = (position: { x: number; y: number }) => {
 };
 
 const Shopping = () => {
-  const initialListsRef = useRef<ShoppingListData[] | null>(null);
-  if (initialListsRef.current === null) {
-    initialListsRef.current = createInitialShoppingLists();
-  }
-
-  const [lists, setLists] = useState<ShoppingListData[]>(
-    () => initialListsRef.current as ShoppingListData[]
-  );
-  const [activeListId, setActiveListId] = useState<string>(
-    () => initialListsRef.current?.[0]?.title ?? ''
-  );
+  const { lists, addItem, toggleChecked, renameItem, removeItem, error: shoppingError, clearError } =
+    useShoppingLists();
+  const [activeListId, setActiveListId] = useState<string>(() => SHOPPING_LISTS[0]?.title ?? '');
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -78,9 +56,28 @@ const Shopping = () => {
   });
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addSubmitting, setAddSubmitting] = useState(false);
   const [addFormState, setAddFormState] = useState<AddItemFormState>({ category: '', title: '' });
   const [contextMenuState, setContextMenuState] = useState<ContextMenuState | null>(null);
   const [renameState, setRenameState] = useState<RenameState | null>(null);
+
+  const handleClearError = useCallback(() => {
+    clearError();
+  }, [clearError]);
+
+  const debugErrorDetails = useMemo(() => {
+    if (!import.meta.env.DEV || !shoppingError?.error) {
+      return '';
+    }
+
+    const { code, message } = shoppingError.error as { code?: string; message?: string };
+    const parts = [code, message].filter(Boolean);
+    if (parts.length === 0) {
+      return '';
+    }
+
+    return ` (${parts.join(' ')})`;
+  }, [shoppingError]);
 
   const listCount = lists.length;
   // apps/web/src/pages/Shopping.tsx: currentIndex mirrors the horizontal pager position for swipe gestures.
@@ -149,27 +146,17 @@ const Shopping = () => {
     selectListByIndex(currentIndex - 1);
   }, [currentIndex, selectListByIndex]);
 
-  const handleToggleItem = useCallback((listIndex: number, itemId: string) => {
-    setLists((prevLists) =>
-      prevLists.map((list, index) => {
-        if (index !== listIndex) {
-          return list;
-        }
+  const handleToggleItem = useCallback(
+    (list: ShoppingListData, itemId: string) => {
+      const target = list.items.find((entry) => entry.id === itemId);
+      if (!target) {
+        return;
+      }
 
-        return {
-          ...list,
-          items: list.items.map((item) =>
-            item.id === itemId
-              ? {
-                  ...item,
-                  done: !item.done
-                }
-              : item
-          )
-        };
-      })
-    );
-  }, []);
+      void toggleChecked(list.slug, target);
+    },
+    [toggleChecked]
+  );
 
   const openAddDialog = useCallback(
     (categoryTitle: string) => {
@@ -178,20 +165,28 @@ const Shopping = () => {
       if (!category) {
         return;
       }
+      if (shoppingError?.source === 'addItem') {
+        clearError();
+      }
       setAddFormState({ category, title: '' });
+      setAddSubmitting(false);
       setAddDialogOpen(true);
     },
-    [lists]
+    [lists, shoppingError, clearError]
   );
 
   const closeAddDialog = useCallback(() => {
     setAddDialogOpen(false);
+    setAddSubmitting(false);
     setAddFormState((prev) => ({ ...prev, title: '' }));
-  }, []);
+    if (shoppingError?.source === 'addItem') {
+      clearError();
+    }
+  }, [shoppingError, clearError]);
 
-  const openContextMenu = useCallback((listIndex: number, item: CheckItem, position: { x: number; y: number }) => {
+  const openContextMenu = useCallback((list: ShoppingListData, item: CheckItem, position: { x: number; y: number }) => {
     setContextMenuState({
-      listIndex,
+      listSlug: list.slug,
       itemId: item.id,
       title: item.title,
       anchor: clampPosition(position)
@@ -221,74 +216,45 @@ const Shopping = () => {
         return null;
       }
 
-      setLists((prevLists) =>
-        prevLists.map((list, index) => {
-          if (index !== current.listIndex) {
-            return list;
-          }
-
-          return {
-            ...list,
-            items: sortItems(
-              list.items.map((item) =>
-                item.id === current.itemId
-                  ? {
-                      ...item,
-                      title: trimmedValue
-                    }
-                  : item
-              )
-            )
-          };
-        })
-      );
-
+      void renameItem(current.listSlug, current.itemId, trimmedValue);
       return null;
     });
-  }, []);
+  }, [renameItem]);
 
-  const deleteItem = useCallback((listIndex: number, itemId: string) => {
-    setLists((prevLists) =>
-      prevLists.map((list, index) => {
-        if (index !== listIndex) {
-          return list;
-        }
+  const deleteItem = useCallback(
+    (listSlug: ShoppingListData['slug'], itemId: string) => {
+      void removeItem(listSlug, itemId);
+    },
+    [removeItem]
+  );
 
-        return {
-          ...list,
-          items: sortItems(list.items.filter((item) => item.id !== itemId))
-        };
-      })
-    );
-  }, []);
-
-  const addItem = useCallback(() => {
+  const submitNewItem = useCallback(() => {
     const trimmed = addFormState.title.trim();
-    if (!addFormState.category || !trimmed) {
+    if (!addFormState.category || !trimmed || addSubmitting) {
       return;
     }
 
-    const newItem: CheckItem = {
-      id: createItemId(addFormState.category),
-      title: trimmed,
-      done: false
-    };
+    const targetList = lists.find((entry) => entry.title === addFormState.category);
+    if (!targetList) {
+      return;
+    }
 
-    setLists((prevLists) =>
-      prevLists.map((list, index) => {
-        if (list.title !== addFormState.category) {
-          return list;
-        }
+    setAddSubmitting(true);
+    if (shoppingError?.source === 'addItem') {
+      clearError();
+    }
 
-        return {
-          ...list,
-          items: sortItems([...list.items, newItem])
-        };
-      })
-    );
-
-    closeAddDialog();
-  }, [addFormState, closeAddDialog]);
+    void (async () => {
+      try {
+        await addItem(targetList.slug, trimmed);
+        closeAddDialog();
+      } catch (error) {
+        // Keep the dialog open and surface the error banner.
+      } finally {
+        setAddSubmitting(false);
+      }
+    })();
+  }, [addFormState, addSubmitting, addItem, clearError, closeAddDialog, lists, shoppingError]);
 
   const categoryOptions = useMemo(() => lists.map((list) => list.title), [lists]);
 
@@ -382,14 +348,14 @@ const Shopping = () => {
       </header>
       {isDesktop ? (
         <div className={styles.desktopGrid} aria-label="Списки покупок">
-          {lists.map((list, index) => (
+          {lists.map((list) => (
             <Checklist
               key={list.title}
               title={list.title}
               items={list.items}
-              onToggle={(itemId) => handleToggleItem(index, itemId)}
+              onToggle={(itemId) => handleToggleItem(list, itemId)}
               onAdd={() => openAddDialog(list.title)}
-              onOpenActions={(item, position) => openContextMenu(index, item, position)}
+              onOpenActions={(item, position) => openContextMenu(list, item, position)}
             />
           ))}
         </div>
@@ -418,9 +384,9 @@ const Shopping = () => {
                       title={list.title}
                       items={list.items}
                       showTitle={false}
-                      onToggle={(itemId) => handleToggleItem(index, itemId)}
+                      onToggle={(itemId) => handleToggleItem(list, itemId)}
                       onAdd={() => openAddDialog(list.title)}
-                      onOpenActions={(item, position) => openContextMenu(index, item, position)}
+                      onOpenActions={(item, position) => openContextMenu(list, item, position)}
                     />
                   </div>
                 </div>
@@ -442,6 +408,15 @@ const Shopping = () => {
         </div>
       )}
 
+      {shoppingError ? (
+        <div className={styles.errorBanner} role="alert">
+          <div className={styles.errorText}>{shoppingError.userMessage + debugErrorDetails}</div>
+          <button type="button" className={styles.errorDismiss} onClick={handleClearError}>
+            Закрыть
+          </button>
+        </div>
+      ) : null}
+
       <Dialog
         open={addDialogOpen}
         onClose={closeAddDialog}
@@ -453,9 +428,11 @@ const Shopping = () => {
           categoryOptions={categoryOptions}
           onCategoryChange={(value) => setAddFormState((prev) => ({ ...prev, category: value }))}
           onTitleChange={(value) => setAddFormState((prev) => ({ ...prev, title: value }))}
-          onSubmit={addItem}
+          onSubmit={submitNewItem}
           onCancel={closeAddDialog}
           autoFocusTitle={isDesktop}
+          submitting={addSubmitting}
+          errorMessage={shoppingError?.source === 'addItem' ? shoppingError.userMessage : undefined}
         />
       </Dialog>
 
@@ -485,7 +462,7 @@ const Shopping = () => {
             return;
           }
           startRename({
-            listIndex: activeContext.listIndex,
+            listSlug: activeContext.listSlug,
             itemId: activeContext.itemId,
             value: activeContext.title
           });
@@ -494,7 +471,7 @@ const Shopping = () => {
           if (!activeContext) {
             return;
           }
-          deleteItem(activeContext.listIndex, activeContext.itemId);
+          deleteItem(activeContext.listSlug, activeContext.itemId);
         }}
       />
     </section>

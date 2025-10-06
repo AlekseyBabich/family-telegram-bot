@@ -1,8 +1,180 @@
+import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Shopping from './Shopping';
-import { createInitialShoppingLists } from './shoppingData';
+import { createInitialShoppingLists, type CheckItem, type ShoppingListData } from './shoppingData';
 import * as shoppingDataModule from './shoppingData';
+
+vi.mock('./shopping/hooks/useShoppingLists', () => {
+  type ShoppingErrorMock = {
+    source:
+      | 'subscribe:checked'
+      | 'subscribe:unchecked'
+      | 'addItem'
+      | 'toggleChecked'
+      | 'renameItem'
+      | 'removeItem';
+    userMessage: string;
+    error: unknown;
+  };
+
+  type AddItemMockArgs = {
+    slug: string;
+    title: string;
+    updateList: (slug: string, updater: (items: CheckItem[]) => CheckItem[]) => void;
+    defaultAddItem: (slug: string, title: string) => Promise<void>;
+  };
+
+  const mockImpls: { addItem?: (args: AddItemMockArgs) => Promise<void> | void } = {};
+
+  const setMockAddItemImplementation = (
+    impl?: (args: AddItemMockArgs) => Promise<void> | void
+  ) => {
+    mockImpls.addItem = impl ?? undefined;
+  };
+
+  const resetMocks = () => {
+    mockImpls.addItem = undefined;
+  };
+
+  const registryKey = 'page';
+  const globalRegistry = (globalThis as {
+    __shoppingHooksTestRegistry?: Record<
+      string,
+      {
+        __setMockAddItemImplementation: typeof setMockAddItemImplementation;
+        __resetShoppingMocks: () => void;
+      }
+    >;
+  }).__shoppingHooksTestRegistry;
+  if (!globalRegistry) {
+    (globalThis as any).__shoppingHooksTestRegistry = {
+      [registryKey]: {
+        __setMockAddItemImplementation: setMockAddItemImplementation,
+        __resetShoppingMocks: resetMocks
+      }
+    };
+  } else {
+    globalRegistry[registryKey] = {
+      __setMockAddItemImplementation: setMockAddItemImplementation,
+      __resetShoppingMocks: resetMocks
+    };
+  }
+
+  return {
+    useShoppingLists: () => {
+      const [lists, setLists] = React.useState<ShoppingListData[]>(() =>
+        shoppingDataModule.createInitialShoppingLists()
+      );
+      const [error, setError] = React.useState<ShoppingErrorMock | null>(null);
+
+      const updateList = React.useCallback(
+        (slug: string, updater: (items: CheckItem[]) => CheckItem[]) => {
+          setLists((current) =>
+            current.map((list) =>
+              list.slug === slug
+                ? { ...list, items: shoppingDataModule.sortItems(updater(list.items)) }
+                : list
+            )
+          );
+        },
+        []
+      );
+
+      const defaultAddItem = React.useCallback(
+        async (slug: string, title: string) => {
+          updateList(slug, (items) => [
+            ...items,
+            {
+              id: `mock-${Math.random().toString(36).slice(2)}`,
+              title,
+              done: false,
+              titleLower: title.toLocaleLowerCase('ru-RU')
+            }
+          ]);
+        },
+        [updateList]
+      );
+
+      const addItem = React.useCallback(
+        async (slug: string, title: string) => {
+          try {
+            const impl = mockImpls.addItem;
+            if (impl) {
+              await impl({ slug, title, updateList, defaultAddItem });
+            } else {
+              await defaultAddItem(slug, title);
+            }
+            setError((current) => (current?.source === 'addItem' ? null : current));
+          } catch (err) {
+            setError({
+              source: 'addItem',
+              userMessage: 'Не удалось добавить позицию. Попробуйте ещё раз.',
+              error: err
+            });
+            throw err;
+          }
+        },
+        [defaultAddItem]
+      );
+
+      const toggleChecked = React.useCallback(
+        async (slug: string, item: { id: string; done: boolean }) => {
+          updateList(slug, (items) =>
+            items.map((entry) =>
+              entry.id === item.id ? { ...entry, done: !entry.done } : entry
+            )
+          );
+          setError((current) => (current?.source === 'toggleChecked' ? null : current));
+        },
+        [updateList]
+      );
+
+      const renameItem = React.useCallback(
+        async (slug: string, itemId: string, value: string) => {
+          updateList(slug, (items) =>
+            items.map((entry) =>
+              entry.id === itemId
+                ? {
+                    ...entry,
+                    title: value,
+                    titleLower: value.toLocaleLowerCase('ru-RU')
+                  }
+                : entry
+            )
+          );
+          setError((current) => (current?.source === 'renameItem' ? null : current));
+        },
+        [updateList]
+      );
+
+      const removeItem = React.useCallback(
+        async (slug: string, itemId: string) => {
+          updateList(slug, (items) => items.filter((entry) => entry.id !== itemId));
+          setError((current) => (current?.source === 'removeItem' ? null : current));
+        },
+        [updateList]
+      );
+
+      const clearError = React.useCallback(() => setError(null), []);
+
+      return React.useMemo(
+        () => ({
+          lists,
+          addItem,
+          toggleChecked,
+          renameItem,
+          removeItem,
+          error,
+          clearError
+        }),
+        [lists, addItem, toggleChecked, renameItem, removeItem, error, clearError]
+      );
+    },
+    __setMockAddItemImplementation: setMockAddItemImplementation,
+    __resetShoppingMocks: resetMocks
+  };
+});
 
 type SwipePoint = { x: number; y: number };
 
@@ -35,16 +207,43 @@ const dispatchSwipe = (
   });
 };
 
+const getShoppingHooksModule = () => {
+  const registry = (globalThis as {
+    __shoppingHooksTestRegistry?: Record<
+      string,
+      {
+        __setMockAddItemImplementation: (
+          impl?: (args: {
+            slug: string;
+            title: string;
+            updateList: (slug: string, updater: (items: CheckItem[]) => CheckItem[]) => void;
+            defaultAddItem: (slug: string, title: string) => Promise<void>;
+          }) => Promise<void> | void
+        ) => void;
+        __resetShoppingMocks: () => void;
+      }
+    >;
+  }).__shoppingHooksTestRegistry;
+
+  const entry = registry?.page;
+  if (!entry) {
+    throw new Error('Shopping hooks test registry is not initialised');
+  }
+
+  return entry;
+};
+
 describe('Shopping mobile swipe container', () => {
   beforeEach(() => {
     setViewportWidth(390);
   });
 
-  afterEach(() => {
-    cleanup();
-    vi.clearAllMocks();
-    vi.restoreAllMocks();
-  });
+afterEach(() => {
+  cleanup();
+  getShoppingHooksModule().__resetShoppingMocks();
+  vi.clearAllMocks();
+  vi.restoreAllMocks();
+});
 
   const renderShopping = () => render(<Shopping />);
 
@@ -314,6 +513,7 @@ describe('Shopping mobile swipe container', () => {
     vi.spyOn(shoppingDataModule, 'createInitialShoppingLists').mockReturnValue([
       {
         title: 'Короткий',
+        slug: 'short',
         items: [
           {
             id: 'short-1',
@@ -324,6 +524,7 @@ describe('Shopping mobile swipe container', () => {
       },
       {
         title: 'Второй',
+        slug: 'second',
         items: [
           {
             id: 'second-1',
@@ -369,10 +570,12 @@ describe('Shopping mobile swipe container', () => {
     vi.spyOn(shoppingDataModule, 'createInitialShoppingLists').mockReturnValue([
       {
         title: 'Пустой',
+        slug: 'empty',
         items: []
       },
       {
         title: 'Соседний',
+        slug: 'neighbor',
         items: [
           {
             id: 'neighbor-1',
@@ -589,5 +792,98 @@ describe('Shopping mobile swipe container', () => {
     await waitFor(() => expect(getTrack().style.transform).toContain('-100%'));
     const secondPagerDot = await screen.findByRole('button', { name: 'Перейти к списку 2' });
     await waitFor(() => expect(secondPagerDot).toHaveAttribute('aria-pressed', 'true'));
+  });
+
+  it('disables the add submit while the write is pending and closes after success', async () => {
+    const hooksModule = getShoppingHooksModule();
+    let resolveAdd: (() => void) | null = null;
+
+    hooksModule.__setMockAddItemImplementation(async ({ slug, title, defaultAddItem }) => {
+      await new Promise<void>((resolve) => {
+        resolveAdd = () => {
+          void defaultAddItem(slug, title).then(resolve);
+        };
+      });
+    });
+
+    renderShopping();
+
+    const firstList = getListForScreen(0);
+    fireEvent.click(within(firstList).getByRole('button', { name: '+ добавить' }));
+
+    const titleInput = await screen.findByLabelText('Название');
+    fireEvent.change(titleInput, { target: { value: 'Малина' } });
+
+    const submitButton = await screen.findByRole('button', { name: 'Добавить' });
+    expect(submitButton).not.toBeDisabled();
+
+    fireEvent.click(submitButton);
+
+    expect(submitButton).toBeDisabled();
+    expect(submitButton).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('dialog', { name: 'Добавить позицию' })).toBeInTheDocument();
+
+    expect(resolveAdd).not.toBeNull();
+    resolveAdd?.();
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Добавить позицию' })).not.toBeInTheDocument()
+    );
+  });
+
+  it('prevents duplicate add mutations when clicking submit repeatedly', async () => {
+    const hooksModule = getShoppingHooksModule();
+    const addImpl = vi.fn(async ({ slug, title, defaultAddItem }) => {
+      await defaultAddItem(slug, title);
+    });
+
+    hooksModule.__setMockAddItemImplementation(addImpl);
+
+    renderShopping();
+
+    const firstList = getListForScreen(0);
+    fireEvent.click(within(firstList).getByRole('button', { name: '+ добавить' }));
+
+    const titleInput = await screen.findByLabelText('Название');
+    const itemTitle = 'Черника';
+    fireEvent.change(titleInput, { target: { value: itemTitle } });
+
+    const submitButton = await screen.findByRole('button', { name: 'Добавить' });
+    fireEvent.click(submitButton);
+    fireEvent.click(submitButton);
+    fireEvent.click(submitButton);
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Добавить позицию' })).not.toBeInTheDocument()
+    );
+
+    expect(addImpl).toHaveBeenCalledTimes(1);
+    const occurrences = within(getListForScreen(0)).getAllByRole('button', { name: itemTitle });
+    expect(occurrences).toHaveLength(1);
+  });
+
+  it('surfaces an error when addItem rejects and keeps the modal open', async () => {
+    const hooksModule = getShoppingHooksModule();
+    hooksModule.__setMockAddItemImplementation(async () => {
+      throw new Error('permission-denied');
+    });
+
+    renderShopping();
+
+    const firstList = getListForScreen(0);
+    fireEvent.click(within(firstList).getByRole('button', { name: '+ добавить' }));
+
+    const titleInput = await screen.findByLabelText('Название');
+    fireEvent.change(titleInput, { target: { value: 'Корица' } });
+
+    const submitButton = await screen.findByRole('button', { name: 'Добавить' });
+    fireEvent.click(submitButton);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Добавить позицию' });
+    expect(dialog).toBeInTheDocument();
+
+    expect(await within(dialog).findByText('Не удалось добавить позицию. Попробуйте ещё раз.')).toBeVisible();
+    expect(await screen.findByText('Не удалось добавить позицию. Попробуйте ещё раз.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Добавить' })).not.toBeDisabled());
   });
 });
