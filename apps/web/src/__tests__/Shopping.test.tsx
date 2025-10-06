@@ -1,8 +1,94 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import React from 'react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
-import { createInitialShoppingLists } from '../pages/shoppingData';
+import { createInitialShoppingLists, type CheckItem, type ShoppingListData } from '../pages/shoppingData';
+import * as shoppingDataModule from '../pages/shoppingData';
+
+vi.mock('../pages/shopping/hooks/useShoppingLists', () => {
+  return {
+    useShoppingLists: () => {
+      const [lists, setLists] = React.useState<ShoppingListData[]>(() =>
+        shoppingDataModule.createInitialShoppingLists()
+      );
+
+      const updateList = React.useCallback(
+        (slug: string, updater: (items: CheckItem[]) => CheckItem[]) => {
+          setLists((current) =>
+            current.map((list) =>
+              list.slug === slug
+                ? { ...list, items: shoppingDataModule.sortItems(updater(list.items)) }
+                : list
+            )
+          );
+        },
+        []
+      );
+
+      const addItem = React.useCallback(
+        async (slug: string, title: string) => {
+          updateList(slug, (items) => [
+            ...items,
+            {
+              id: `mock-${Math.random().toString(36).slice(2)}`,
+              title,
+              done: false,
+              titleLower: title.toLocaleLowerCase('ru-RU')
+            }
+          ]);
+        },
+        [updateList]
+      );
+
+      const toggleChecked = React.useCallback(
+        async (slug: string, item: { id: string; done: boolean }) => {
+          updateList(slug, (items) =>
+            items.map((entry) =>
+              entry.id === item.id ? { ...entry, done: !entry.done } : entry
+            )
+          );
+        },
+        [updateList]
+      );
+
+      const renameItem = React.useCallback(
+        async (slug: string, itemId: string, value: string) => {
+          updateList(slug, (items) =>
+            items.map((entry) =>
+              entry.id === itemId
+                ? {
+                    ...entry,
+                    title: value,
+                    titleLower: value.toLocaleLowerCase('ru-RU')
+                  }
+                : entry
+            )
+          );
+        },
+        [updateList]
+      );
+
+      const removeItem = React.useCallback(
+        async (slug: string, itemId: string) => {
+          updateList(slug, (items) => items.filter((entry) => entry.id !== itemId));
+        },
+        [updateList]
+      );
+
+      return React.useMemo(
+        () => ({
+          lists,
+          addItem,
+          toggleChecked,
+          renameItem,
+          removeItem
+        }),
+        [lists, addItem, toggleChecked, renameItem, removeItem]
+      );
+    }
+  };
+});
 
 const setViewportWidth = (width: number) => {
   Object.defineProperty(window, 'innerWidth', {
@@ -12,6 +98,11 @@ const setViewportWidth = (width: number) => {
   });
   window.dispatchEvent(new Event('resize'));
 };
+
+const getRenderedLists = () =>
+  screen
+    .getAllByRole('list')
+    .filter((list) => within(list).queryByTestId('shopping-add-entry'));
 
 describe('Shopping page responsive behaviour', () => {
   beforeEach(() => {
@@ -58,7 +149,7 @@ describe('Shopping page responsive behaviour', () => {
     expect(screen.queryByRole('button', { name: /Перейти к списку/i })).not.toBeInTheDocument();
   });
 
-  it('renders checklist items with emoji icons that toggle on click', () => {
+  it('renders checklist items with emoji icons that toggle on click', async () => {
     render(
       <MemoryRouter initialEntries={["/shopping"]}>
         <App />
@@ -66,7 +157,7 @@ describe('Shopping page responsive behaviour', () => {
     );
 
     const initialLists = createInitialShoppingLists();
-    const renderedLists = screen.getAllByRole('list');
+    const renderedLists = getRenderedLists();
     expect(renderedLists).toHaveLength(initialLists.length);
 
     initialLists.forEach((initialList, index) => {
@@ -92,12 +183,15 @@ describe('Shopping page responsive behaviour', () => {
     expect(firstItem).toHaveTextContent(firstItemTitle);
 
     fireEvent.click(firstItem);
-    expect(firstItem).toHaveTextContent('✅');
-    expect(firstItem).toHaveAttribute('aria-pressed', 'true');
+    const checkedButton = await screen.findByRole('button', { name: firstItemTitle });
+    expect(checkedButton).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(firstItem);
-    expect(firstItem).toHaveTextContent('❌');
-    expect(firstItem).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(checkedButton);
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: firstItemTitle })
+      ).toHaveAttribute('aria-pressed', 'false')
+    );
   });
 
   it('never applies strikethrough styling to checklist text', () => {
@@ -108,7 +202,7 @@ describe('Shopping page responsive behaviour', () => {
     );
 
     const firstInitialList = createInitialShoppingLists()[0];
-    const firstList = screen.getAllByRole('list')[0];
+    const firstList = getRenderedLists()[0];
     const firstItemTitle = firstInitialList.items[0]?.title ?? '';
     const firstItem = within(firstList).getAllByRole('button')[0];
     expect(firstItem).toHaveTextContent(firstItemTitle);
@@ -156,7 +250,7 @@ describe('Shopping page responsive behaviour', () => {
     errorSpy.mockRestore();
   });
 
-  it('keeps the active tab after adding an item on mobile', () => {
+  it('keeps the active tab after adding an item on mobile', async () => {
     setViewportWidth(500);
 
     render(
@@ -167,9 +261,14 @@ describe('Shopping page responsive behaviour', () => {
 
     const secondDot = screen.getByRole('button', { name: 'Перейти к списку 2' });
     fireEvent.click(secondDot);
-    expect(secondDot).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Перейти к списку 2' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+    );
 
-    const lists = screen.getAllByRole('list');
+    const lists = getRenderedLists();
     const householdPanel = lists[1]?.parentElement as HTMLElement;
     const addButton = within(householdPanel).getByRole('button', { name: '+ добавить' });
     fireEvent.click(addButton);
@@ -178,7 +277,12 @@ describe('Shopping page responsive behaviour', () => {
     fireEvent.change(titleInput, { target: { value: 'Абажур настольный' } });
     fireEvent.click(screen.getByRole('button', { name: 'Добавить' }));
 
-    expect(secondDot).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Перейти к списку 2' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+    );
   });
 
   it('keeps the active tab after renaming an item on mobile', () => {
@@ -194,7 +298,7 @@ describe('Shopping page responsive behaviour', () => {
     fireEvent.click(thirdDot);
     expect(thirdDot).toHaveAttribute('aria-pressed', 'true');
 
-    const lists = screen.getAllByRole('list');
+    const lists = getRenderedLists();
     const thirdList = lists[2];
     const firstItem = within(thirdList).getAllByRole('button')[0];
 

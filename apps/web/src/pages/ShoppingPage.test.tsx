@@ -1,8 +1,93 @@
+import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Shopping from './Shopping';
-import { createInitialShoppingLists } from './shoppingData';
+import { createInitialShoppingLists, type CheckItem, type ShoppingListData } from './shoppingData';
 import * as shoppingDataModule from './shoppingData';
+
+vi.mock('./shopping/hooks/useShoppingLists', () => {
+  return {
+    useShoppingLists: () => {
+      const [lists, setLists] = React.useState<ShoppingListData[]>(() =>
+        shoppingDataModule.createInitialShoppingLists()
+      );
+
+      const updateList = React.useCallback(
+        (slug: string, updater: (items: CheckItem[]) => CheckItem[]) => {
+          setLists((current) =>
+            current.map((list) =>
+              list.slug === slug
+                ? { ...list, items: shoppingDataModule.sortItems(updater(list.items)) }
+                : list
+            )
+          );
+        },
+        []
+      );
+
+      const addItem = React.useCallback(
+        async (slug: string, title: string) => {
+          updateList(slug, (items) => [
+            ...items,
+            {
+              id: `mock-${Math.random().toString(36).slice(2)}`,
+              title,
+              done: false,
+              titleLower: title.toLocaleLowerCase('ru-RU')
+            }
+          ]);
+        },
+        [updateList]
+      );
+
+      const toggleChecked = React.useCallback(
+        async (slug: string, item: { id: string; done: boolean }) => {
+          updateList(slug, (items) =>
+            items.map((entry) =>
+              entry.id === item.id ? { ...entry, done: !entry.done } : entry
+            )
+          );
+        },
+        [updateList]
+      );
+
+      const renameItem = React.useCallback(
+        async (slug: string, itemId: string, value: string) => {
+          updateList(slug, (items) =>
+            items.map((entry) =>
+              entry.id === itemId
+                ? {
+                    ...entry,
+                    title: value,
+                    titleLower: value.toLocaleLowerCase('ru-RU')
+                  }
+                : entry
+            )
+          );
+        },
+        [updateList]
+      );
+
+      const removeItem = React.useCallback(
+        async (slug: string, itemId: string) => {
+          updateList(slug, (items) => items.filter((entry) => entry.id !== itemId));
+        },
+        [updateList]
+      );
+
+      return React.useMemo(
+        () => ({
+          lists,
+          addItem,
+          toggleChecked,
+          renameItem,
+          removeItem
+        }),
+        [lists, addItem, toggleChecked, renameItem, removeItem]
+      );
+    }
+  };
+});
 
 type SwipePoint = { x: number; y: number };
 
@@ -314,6 +399,7 @@ describe('Shopping mobile swipe container', () => {
     vi.spyOn(shoppingDataModule, 'createInitialShoppingLists').mockReturnValue([
       {
         title: 'Короткий',
+        slug: 'short',
         items: [
           {
             id: 'short-1',
@@ -324,6 +410,7 @@ describe('Shopping mobile swipe container', () => {
       },
       {
         title: 'Второй',
+        slug: 'second',
         items: [
           {
             id: 'second-1',
@@ -369,10 +456,12 @@ describe('Shopping mobile swipe container', () => {
     vi.spyOn(shoppingDataModule, 'createInitialShoppingLists').mockReturnValue([
       {
         title: 'Пустой',
+        slug: 'empty',
         items: []
       },
       {
         title: 'Соседний',
+        slug: 'neighbor',
         items: [
           {
             id: 'neighbor-1',
